@@ -1,0 +1,31 @@
+"0","```r
+
+## Step 3: inferential statistics
+hc_values = mean_expressivity_pos$mean_expressivity_hc
+scz_values = mean_expressivity_pos$mean_expressivity_scz
+hc_values_clean = na.omit(hc_values)
+scz_values_clean = na.omit(scz_values)
+shapiro_hc = shapiro.test(hc_values_clean)
+shapiro_scz = shapiro.test(scz_values_clean)
+levene_test = leveneTest(c(hc_values_clean, scz_values_clean), 
+                         factor(c(rep(\"HC\", length(hc_values_clean)), rep(\"SCZ\", length(scz_values_clean)))))
+if (shapiro_hc$p.value > 0.05 && shapiro_scz$p.value > 0.05 && levene_test$`Pr(>F)`[1] > 0.05) {
+  # Normality : test t de Student
+  t_test_result_exp = t.test(hc_values_clean, scz_values_clean)
+  print(\"Test t de Student:\")
+  print(t_test_result_exp)
+} else {
+  # else: test de Wilcoxon
+  wilcox_test_exp = wilcox.test(hc_values_clean, scz_values_clean)
+  print(\"Test de Wilcoxon:\")
+  print(wilcox_test_exp)
+}
+```"
+"1","[1] \"Test de Wilcoxon:\"
+
+	Wilcoxon rank sum exact test
+
+data:  hc_values_clean and scz_values_clean
+W = 179, p-value = 0.5831
+alternative hypothesis: true location shift is not equal to 0
+"

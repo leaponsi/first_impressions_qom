@@ -1,0 +1,27 @@
+"0","```r
+au_vars = c(\"stimuli_AU12_r\", \"stimuli_AU25_r\", \"stimuli_AU26_r\")
+
+cat(\"\nGraphes de régression entre les variables significatives et AU12, AU25, AU26:\n\")
+```"
+"1","
+Graphes de régression entre les variables significatives et AU12, AU25, AU26:
+"
+"0","```r
+for (var in selected_vars) {
+  for (au in au_vars) {
+    result = correlation_with_pvalue(patient_data_selected[[var]], patient_data_selected[[au]])
+    
+    if (result$p_value < 0.05) { 
+      p = ggplot(patient_data_selected, aes_string(x = var, y = au)) +
+        geom_point(color = \"darkgreen\", alpha = 0.6) + 
+        geom_smooth(method = \"lm\", color = \"red\", se = FALSE) +  
+        labs(title = paste(\"Régression de\", au, \"sur\", var),
+             x = var, 
+             y = au) +
+        theme_minimal()
+      
+      print(p)  
+    }
+  }
+}
+```"

@@ -1,0 +1,17 @@
+"0","```r
+if (length(results_total_score) > 0) {
+  for (variable in names(results_total_score)) {
+    p = ggplot(patient_data, aes_string(x = variable, y = \"Total_score\")) +
+      geom_point(color = \"blue\", alpha = 0.6) + 
+      geom_smooth(method = \"lm\", color = \"red\", se = FALSE) +  
+      labs(title = paste(\"Régression de Total_score sur\", variable),
+           x = variable, 
+           y = \"Total_score\") +
+      theme_minimal()
+    
+    print(p)
+  }
+} else {
+  cat(\"Aucune variable n'est significativement corrélée avec Total_score.\n\")
+}
+```"

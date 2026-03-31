@@ -1,0 +1,23 @@
+"0","```r
+for (item in names(results_total_score)) {
+  plot_data = patient_data_PANSS %>%
+    dplyr::select(Total_score, all_of(item)) %>%
+    rename(PANSS_score = all_of(item)) %>%
+    mutate(PANSS_group = as.factor(PANSS_score)) %>%
+    group_by(PANSS_group) %>%
+    summarize(mean_total_score = mean(Total_score, na.rm = TRUE), .groups = \"drop\")
+  
+  plot = ggplot(plot_data, aes(x = PANSS_group, y = mean_total_score)) +
+    geom_bar(stat = \"identity\", fill = \"steelblue\") +
+    labs(
+      title = paste(\"Mean Total Score by\", item, \"groups\"),
+      x = paste(item, \"groups (1 to 7)\"),
+      y = \"Mean Total Score\"
+    ) +
+    coord_cartesian(ylim = c(300, 600)) +  # Zoom sur l'axe des ordonnées
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(plot)
+}
+```"

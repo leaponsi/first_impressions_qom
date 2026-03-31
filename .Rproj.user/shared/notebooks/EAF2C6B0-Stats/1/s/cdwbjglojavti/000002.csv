@@ -1,0 +1,49 @@
+"0","```r
+result_1st_imp$Dataset = \"Dataset_1\"
+result_1st_imp_2$Dataset = \"Dataset_2\"
+result_1st_imp_3$Dataset = \"Dataset_3\"
+combined_results = bind_rows(result_1st_imp, result_1st_imp_2, result_1st_imp_3)
+
+combined_results$Interaction_Factor = factor(
+  interaction(combined_results$Type, combined_results$Dataset),
+  levels = c(
+    \"Healthy.Dataset_1\", \"Patient.Dataset_1\",
+    \"Healthy.Dataset_2\", \"Patient.Dataset_2\",
+    \"Healthy.Dataset_3\", \"Patient.Dataset_3\"
+  )
+)
+
+full_plot = ggplot(combined_results, aes(x = Dataset, y = Total_score, fill = Interaction_Factor)) +
+  stat_summary(fun = mean, geom = \"bar\", position = position_dodge(width = 0.9)) +
+  stat_summary(fun.data = mean_cl_boot, geom = \"errorbar\", position = position_dodge(width = 0.9), width = 0.2) +
+  theme_minimal() + 
+  labs(
+    title = \"First Impression Scores\",
+    x = \"Experimental condition\",
+    y = \"Total Score\"
+  ) +
+  scale_fill_manual(
+    values = c(
+      \"Healthy.Dataset_1\" = \"orange\",
+      \"Patient.Dataset_1\" = \"steelblue\",
+      \"Healthy.Dataset_2\" = \"gold\",
+      \"Patient.Dataset_2\" = \"lightblue\",
+      \"Healthy.Dataset_3\" = \"tan\",
+      \"Patient.Dataset_3\" = \"turquoise4\"
+    ),
+    labels = c(
+      \"Healthy.Dataset_1\" = \"HC - no label\",
+      \"Patient.Dataset_1\" = \"ISZ - no label\",
+      \"Healthy.Dataset_2\" = \"HC - with label\",
+      \"Patient.Dataset_2\" = \"ISZ - with label\",
+      \"Healthy.Dataset_3\" = \"HC - with label\",
+      \"Patient.Dataset_3\" = \"ISZ - ASD label\"
+    ),
+    name = \"Group & Dataset\"
+  ) +
+  scale_x_discrete(
+    labels = c(\"Dataset_1\" = \"no label\", \"Dataset_2\" = \"with label\", \"Dataset_3\" = \"mislabeled with ASD label\")
+  ) 
+
+full_plot
+```"

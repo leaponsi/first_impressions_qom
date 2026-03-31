@@ -1,0 +1,20 @@
+"0","```r
+# plot 
+for (item in names(results_movements)) {
+  plot_data = correlation_data %>%
+    dplyr::select(Total_score, all_of(item)) %>%
+    rename(variable_score = all_of(item))
+  
+  plot = ggplot(plot_data, aes(x = variable_score, y = Total_score)) +
+    geom_point(alpha = 0.5, color = \"steelblue\") +
+    geom_smooth(method = \"lm\", color = \"red\", se = FALSE) +
+    labs(
+      title = paste(\"Correlation between Total Score and\", item),
+      x = item,
+      y = \"Total Score\"
+    ) +
+    theme_minimal()
+  
+  print(plot)
+}
+```"

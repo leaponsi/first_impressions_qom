@@ -1,0 +1,14 @@
+"0","```r
+all_participants = bind_rows(result_1st_imp, result_1st_imp_2, result_1st_imp_3)
+unique_participants = all_participants %>% distinct(CASE, .keep_all = TRUE)
+
+rater_participants_descriptive = unique_participants %>%
+  summarise(
+    Mean_age = mean(Age, na.rm = TRUE),
+    Sd_age = sd(Age, na.rm = TRUE),
+    Gender_H = sum(Gender == \"H\"),               
+    Gender_F = sum(Gender == \"F\")               
+  )
+
+rater_participants_descriptive
+```"

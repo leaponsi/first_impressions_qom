@@ -1,0 +1,7 @@
+"0","```r
+PRG_PATH = dirname(rstudioapi::getSourceEditorContext()$path) 
+PATH = dirname(PRG_PATH)
+DAT_PATH = file.path(PATH, \"DAT\")
+LIB_PATH = file.path(PRG_PATH, \"LIB\")
+RES_PATH = file.path(PATH, \"RES\")
+```"

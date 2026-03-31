@@ -1,0 +1,51 @@
+"0","```r
+shapiro_test_HC = shapiro.test(data$Age[data$CAT == \"HC\"])
+shapiro_test_SCZ = shapiro.test(data$Age[data$CAT == \"SCZ\"])
+levene_test_age = leveneTest(Age ~ CAT, data = data)
+```"
+"1","Avis : group coerced to factor.
+"
+"0","```r
+# Age
+if (shapiro_test_HC$p.value > 0.05 && shapiro_test_SCZ$p.value > 0.05 && levene_test_age$`Pr(>F)`[1] > 0.05) {
+  # Normality : test t de Student
+  t_test_result_age = t.test(Age ~ CAT, data = data)
+  print(\"Test t de Student pour l'âge:\")
+  print(t_test_result_age)
+} else {
+  # Else : test de Wilcoxon
+  wilcoxon_test_result_age = wilcox.test(Age ~ CAT, data = data)
+  print(\"Test de Wilcoxon pour l'âge:\")
+  print(wilcoxon_test_result_age)
+}
+```"
+"1","Avis : impossible de calculer la p-value exacte avec des ex-aequos
+"
+"1","[1] \"Test de Wilcoxon pour l'âge:\"
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  Age by CAT
+W = 170, p-value = 0.4228
+alternative hypothesis: true location shift is not equal to 0
+"
+"0","```r
+# Gender
+chi_test_gender = chisq.test(data$Sexe, data$CAT)
+```"
+"1","Avis : L’approximation du Chi-2 est peut-être incorrecte
+"
+"0","```r
+print(\"Test du Chi-2 pour le genre:\")
+```"
+"1","[1] \"Test du Chi-2 pour le genre:\"
+"
+"0","```r
+print(chi_test_gender)
+```"
+"1","
+	Pearson's Chi-squared test
+
+data:  data$Sexe and data$CAT
+X-squared = 0, df = 1, p-value = 1
+"

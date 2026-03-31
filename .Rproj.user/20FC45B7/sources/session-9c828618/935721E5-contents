@@ -1,0 +1,1225 @@
+---
+title: "1st impression study: statistical analyses"
+output: html_notebook
+---
+### Experiment summary
+40 "stimulus participants" including 20 participants with a diagnosis of schizophrenia (SCZ) and 20 matched healthy controls were filmed while answering the question: "what would you do if I gave you 1 millions euros?". Soundless video recordings of the stimulus participants were transformed into point-light displays using Mediapipe. 300 "rater participants" viewed the video recordings of the stimulus participants and rated their first impressions. First 100 participants viewed the stimuli without knowledge of their diagnosis. Second 100 participants viewed the stimuli with knowledge of their diagnosis. LAst 100 participants viewed the stimuli with individuals with SCZ mislabeled as having ASD. 
+
+### Manip check 
+No significant difference between stimulus participants HC and SCZ in age and sex. 
+
+### Hypotheses 
+H1: Individuals diagnosed with schizophrenia would receive more negative first impressions than healthy controls in the no-label condition.   
+H2: Disclosing schizophrenia diagnosis would result in more negative first impressions of individuals with schizophrenia compared to when no diagnosis is disclosed.  
+H3: Disclosing an ASD diagnosis instead of schizophrenia would lead to more favorable first impressions of individuals with schizophrenia.  
+
+### Additional analyses 
+Correlations with patients symptoms and medications. 
+
+### Summary
+1. [Initiate](#initiate)
+
+2. [Stimuli participants](#stimuli-participants)  
+   2.1. [Stimuli participants descriptive statistics](#stimuli-participants-descriptive-statistics)  
+   2.2. [Manip check](#manip-check)
+
+3. [Stimuli participants facial expression](#stimuli-participants-facial-expression)  
+   3.1. [Positive expressivity](#positive-expressivity)  
+   3.2. [Single AU analysis](#single-au-analysis)  
+
+4. [Rater participants descriptive statistics](#rater-participants-descriptive-statistics) 
+
+5. [1st imp](#1st-imp)  
+   5.1. [Analyze items by items](#analyze-items-by-items)  
+      5.1.1. [Descriptive statistics](#descriptive-statistics)  
+      5.1.2. [Inferential statistics](#inferential-statistics)  
+   
+   5.2. [Analyze total score](#analyze-total-score)  
+      5.2.1. [Descriptive statistics](#descriptive-statistics)  
+      5.2.2. [Inferential statistics](#inferential-statistics)
+
+6. [Correlations](#correlations)  
+   6.1. [Movements](#movements)  
+   6.2. [Patients symptoms](#patients-symptoms)
+
+
+## 1. Initiate
+<a name="initiate"></a>
+Library 
+```{r}
+easypackages::libraries("tidyverse", "haven", "lme4", "lmerTest", "jtools", "DescTools", 
+                        "psych", "sjPlot", "sjstats", "effectsize", "clubSandwich", "readxl", 
+                        "dplyr", "tidyr", "stringr", "openxlsx", "ggplot2", "emmeans", "ggpubr",
+                        "forcats", "patchwork", "Matrix", "gridExtra", "psych", "ggcorrplot", "car")
+```
+Set directory 
+```{r}
+PRG_PATH = dirname(rstudioapi::getSourceEditorContext()$path) 
+PATH = dirname(PRG_PATH)
+DAT_PATH = file.path(PATH, "DAT")
+LIB_PATH = file.path(PRG_PATH, "LIB")
+RES_PATH = file.path(PATH, "RES")
+```
+Open the files 
+```{r}
+setwd(RES_PATH)
+load("result_hc.rdata")
+load("result_scz.rdata")
+load("result_1st_imp.rdata")
+load("result_1st_imp_2.rdata")
+load("result_1st_imp_3.rdata")
+PATH = file.path(DAT_PATH, "questionnaire.xlsx")
+data = read_xlsx(PATH)
+```
+Execute the functions 
+```{r}
+source(file.path(LIB_PATH, "sig_pwc.R"))
+source(file.path(LIB_PATH, "cheesylrt.R"))
+source(file.path(LIB_PATH, "cheesy.R"))
+source(file.path(LIB_PATH, "cleanupgraph_nature.R"))
+```
+
+## 2. Stimuli participants
+<a name="Stimuli participants"></a>
+
+### 2.1 Stimuli participants descriptive statistics
+<a name="Stimuli participants descriptive statistics"></a>
+```{r}
+stimuli_participants_descriptive = data %>%
+  group_by(CAT) %>%
+  summarise(
+    Mean_age = mean(Age, na.rm = TRUE),
+    Sd_age = sd(Age, na.rm = TRUE),
+    Gender_H = sum(Sexe == "H"),               
+    Gender_F = sum(Sexe == "F"),               
+    PANAS_neg = mean(`PANAS neg`, na.rm = TRUE),
+    PANAS_pos = mean(`PANAS pos`, na.rm = TRUE),
+    CPZ_equivalent_mg = mean(`Med (mg)`, na.rm = TRUE),
+    sd_CPZ = sd(`Med (mg)`, na.rm = TRUE),
+    PANSS_pos = mean(`PANSS +`, na.rm = TRUE), 
+    sd_PANSS_pos = sd(`PANSS +`, na.rm = TRUE), 
+    PANSS_neg = mean(`PANSS -`, na.rm = TRUE),
+    sd_PANSS_neg = sd(`PANSS -`, na.rm = TRUE),
+    PANSS_gen = mean(`PANSS GEN`, na.rm = TRUE),
+    sd_PANSS_gen = sd(`PANSS GEN`, na.rm = TRUE),
+    Diagnostic = mean(`Durée maladie`, na.rm = TRUE),
+    sd_diagnostic = sd(`Durée maladie`, na.rm = TRUE)
+  ) %>%
+pivot_longer(cols = -CAT, names_to = "Information", values_to = "Valeur") %>%
+pivot_wider(names_from = CAT, values_from = Valeur)
+
+
+stimuli_participants_descriptive
+```
+
+### 2.2 Manip check
+<a name="Manip check"></a>
+```{r}
+shapiro_test_HC = shapiro.test(data$Age[data$CAT == "HC"])
+shapiro_test_SCZ = shapiro.test(data$Age[data$CAT == "SCZ"])
+levene_test_age = leveneTest(Age ~ CAT, data = data)
+
+# Age
+if (shapiro_test_HC$p.value > 0.05 && shapiro_test_SCZ$p.value > 0.05 && levene_test_age$`Pr(>F)`[1] > 0.05) {
+  # Normality : test t de Student
+  t_test_result_age = t.test(Age ~ CAT, data = data)
+  print("Test t de Student pour l'âge:")
+  print(t_test_result_age)
+} else {
+  # Else : test de Wilcoxon
+  wilcoxon_test_result_age = wilcox.test(Age ~ CAT, data = data)
+  print("Test de Wilcoxon pour l'âge:")
+  print(wilcoxon_test_result_age)
+}
+
+# Gender
+chi_test_gender = chisq.test(data$Sexe, data$CAT)
+print("Test du Chi-2 pour le genre:")
+print(chi_test_gender)
+```
+
+
+
+## 3. Stimuli participants facial expression
+<a name="Stimuli participants facial expression"></a>
+
+### 3.1 Positive expressivity 
+<a name="Positive expressivity"></a>
+```{r}
+## Step 1: dataset
+mean_expressivity_pos = merge(data.frame(mean_expressivity_hc = result_hc$mean_expressivity),
+                              data.frame(mean_expressivity_scz = result_scz$mean_expressivity),
+                              by = "row.names", all = TRUE)
+rownames(mean_expressivity_pos) = NULL
+colnames(mean_expressivity_pos) = c("Index", "mean_expressivity_hc", "mean_expressivity_scz")
+
+means = mean_expressivity_pos %>%
+  summarise(
+    mean_hc = mean(mean_expressivity_hc, na.rm = TRUE),
+    mean_scz = mean(mean_expressivity_scz, na.rm = TRUE)
+  )
+
+means_long = pivot_longer(means, cols = everything(), 
+                          names_to = "Condition", values_to = "Mean")
+
+## Step 2: barplot
+bar_plot_pos = ggplot(means_long, aes(x = Condition, y = Mean, fill = Condition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Positive expressivity",
+       x = "Group",
+       y = "Mean score (pixels)") +
+  theme_minimal()
+
+bar_plot_pos
+
+## Step 3: inferential statistics
+hc_values = mean_expressivity_pos$mean_expressivity_hc
+scz_values = mean_expressivity_pos$mean_expressivity_scz
+hc_values_clean = na.omit(hc_values)
+scz_values_clean = na.omit(scz_values)
+shapiro_hc = shapiro.test(hc_values_clean)
+shapiro_scz = shapiro.test(scz_values_clean)
+levene_test = leveneTest(c(hc_values_clean, scz_values_clean), 
+                         factor(c(rep("HC", length(hc_values_clean)), rep("SCZ", length(scz_values_clean)))))
+if (shapiro_hc$p.value > 0.05 && shapiro_scz$p.value > 0.05 && levene_test$`Pr(>F)`[1] > 0.05) {
+  # Normality : test t de Student
+  t_test_result_exp = t.test(hc_values_clean, scz_values_clean)
+  print("Test t de Student:")
+  print(t_test_result_exp)
+} else {
+  # else: test de Wilcoxon
+  wilcox_test_exp = wilcox.test(hc_values_clean, scz_values_clean)
+  print("Test de Wilcoxon:")
+  print(wilcox_test_exp)
+}
+```
+
+### 3.2. Single AU analysis 
+<a name="Single AU analysis"></a>
+
+```{r}
+cohen_d = function(x, y) {
+  n1 = length(x)
+  n2 = length(y)
+  mean_diff = mean(x) - mean(y)
+  pooled_sd = sqrt(((n1 - 1) * var(x) + (n2 - 1) * var(y)) / (n1 + n2 - 2))
+  return(mean_diff / pooled_sd)
+}
+
+wilcoxon_r = function(stat, n) {
+  return(stat / (n * (n + 1) / 2))
+}
+
+variables_au = c(
+  "mean_AU01_r", "mean_AU02_r", "mean_AU04_r", "mean_AU05_r",
+  "mean_AU06_r", "mean_AU07_r", "mean_AU09_r", "mean_AU10_r",
+  "mean_AU12_r", "mean_AU14_r", "mean_AU15_r", "mean_AU17_r",
+  "mean_AU20_r", "mean_AU23_r", "mean_AU25_r", "mean_AU26_r",
+  "mean_AU45_r"
+)
+
+for (variable in variables_au) {
+  # Step 1: dataset
+  au_data = merge(
+    data.frame(hc = result_hc[[variable]]),
+    data.frame(scz = result_scz[[variable]]),
+    by = "row.names", all = TRUE
+  )
+  rownames(au_data) = NULL
+  colnames(au_data) = c("Index", "hc", "scz")
+  
+  means = au_data %>%
+    summarise(
+      mean_hc = mean(hc, na.rm = TRUE),
+      mean_scz = mean(scz, na.rm = TRUE)
+    )
+  
+  means_long = pivot_longer(means, cols = everything(), 
+                             names_to = "Condition", values_to = "Mean")
+  
+  # Step 2: t de Student or Wilcoxon
+  hc_values = na.omit(au_data$hc)
+  scz_values = na.omit(au_data$scz)
+  shapiro_test_hc = shapiro.test(hc_values)
+  shapiro_test_scz = shapiro.test(scz_values)
+  levene_test = leveneTest(c(hc_values, scz_values), 
+                            factor(c(rep("HC", length(hc_values)), rep("SCZ", length(scz_values)))))
+  
+  is_significant = FALSE
+  p_value = NA
+  effect_size = NA
+  
+  if (shapiro_test_hc$p.value > 0.05 && shapiro_test_scz$p.value > 0.05 && levene_test$`Pr(>F)`[1] > 0.05) {
+    # Test t de Student
+    t_test_result = t.test(hc_values, scz_values)
+    p_value = t_test_result$p.value
+    if (p_value < 0.05) {
+      is_significant = TRUE
+      effect_size = cohen_d(hc_values, scz_values)
+      print(paste("Test t de Student significatif pour", variable, ":"))
+      print(t_test_result)
+      print(paste("Taille d'effet (Cohen's d) :", round(effect_size, 3)))
+    }
+  } else {
+    # Test de Wilcoxon
+    wilcox_test_result = wilcox.test(hc_values, scz_values)
+    p_value = wilcox_test_result$p.value
+    if (p_value < 0.05) {
+      is_significant = TRUE
+      effect_size = wilcoxon_r(wilcox_test_result$statistic, length(hc_values) + length(scz_values))
+      print(paste("Test de Wilcoxon significatif pour", variable, ":"))
+      print(wilcox_test_result)
+      print(paste("Taille d'effet (r) :", round(effect_size, 3)))
+    }
+  }
+  
+  # Step 3: barplot   
+  if (is_significant) {
+    sem_hc = sd(hc_values, na.rm = TRUE) / sqrt(length(hc_values))
+    sem_scz = sd(scz_values, na.rm = TRUE) / sqrt(length(scz_values))
+    
+    means_long = means_long %>%
+      mutate(
+        SEM = c(sem_hc, sem_scz)
+      )
+    
+    bar_plot = ggplot(means_long, aes(x = Condition, y = Mean, fill = Condition)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      geom_errorbar(aes(ymin = Mean - SEM, ymax = Mean + SEM), 
+                    width = 0.2, position = position_dodge(0.9)) +
+      labs(title = paste(variable, "- Mean Comparison (p =", signif(p_value, 3), 
+                         ", Effect Size =", signif(effect_size, 3), ")"),
+           x = "Group",
+           y = "Mean score") +
+      theme_minimal()
+    
+    print(bar_plot)
+  }
+}
+```
+
+## 4. Rater participants descriptive statistics
+<a name="Rater participants descriptive statistics"></a>
+```{r} 
+all_participants = bind_rows(result_1st_imp, result_1st_imp_2, result_1st_imp_3)
+unique_participants = all_participants %>% distinct(CASE, .keep_all = TRUE)
+
+rater_participants_descriptive = unique_participants %>%
+  summarise(
+    Mean_age = mean(Age, na.rm = TRUE),
+    Sd_age = sd(Age, na.rm = TRUE),
+    Gender_H = sum(Gender == "H"),               
+    Gender_F = sum(Gender == "F")               
+  )
+
+rater_participants_descriptive
+```
+
+```{r}
+create_descriptive_table = function(data) {
+  data %>%
+    summarise(
+      Mean_age = mean(Age, na.rm = TRUE),
+      Sd_age = sd(Age, na.rm = TRUE),
+      Gender_H = sum(Gender == "H"),               
+      Gender_F = sum(Gender == "F")               
+    )
+}
+
+descriptive_1st_imp = create_descriptive_table(result_1st_imp)
+descriptive_1st_imp_2 = create_descriptive_table(result_1st_imp_2)
+descriptive_1st_imp_3 = create_descriptive_table(result_1st_imp_3)
+
+all_participants = bind_rows(
+  result_1st_imp %>% mutate(Dataset = "1"), 
+  result_1st_imp_2 %>% mutate(Dataset = "2"),
+  result_1st_imp_3 %>% mutate(Dataset = "3")
+)
+
+unique_participants = all_participants %>% distinct(CASE, .keep_all = TRUE)
+
+rater_participants_descriptive = unique_participants %>%
+  summarise(
+    Mean_age = mean(Age, na.rm = TRUE),
+    Sd_age = sd(Age, na.rm = TRUE),
+    Gender_H = sum(Gender == "H"),               
+    Gender_F = sum(Gender == "F")               
+  )
+
+unique_participants$Gender = as.factor(ifelse(unique_participants$Gender == "H", 1, 0))
+
+lmm_age = lmer(Age ~ Dataset + (1 | Dataset), data = unique_participants)
+summary(lmm_age)
+anova_lmm_age_global = Anova(lmm_age, type = "III")
+print(anova_lmm_age_global)
+
+lmm_gender = glmer(Gender ~ Dataset + (1 | Dataset), data = unique_participants, family = binomial)
+summary(lmm_gender)
+anova_lmm_gender_global = Anova(lmm_gender, type = "III")
+print(anova_lmm_gender_global)
+```
+
+
+## 5. 1st imp
+<a name="1st_imp"></a>
+
+### 5.1 Analyze items by items
+<a name="Analyze items by items"></a>
+
+#### 5.1.1 Descriptive statistics
+<a name="Descriptive statistics"></a>
+
+Dataset 1 - no label  
+```{r}
+impressions_long = result_1st_imp %>%
+  pivot_longer(
+    cols = c(Sympathique, Bizarre, Intelligente, Appreciable, Confiance, Dominante, Conversation, Temps, Voisin, Assis), 
+    names_to = "Impression",
+    values_to = "Score"
+  ) %>%
+  mutate(Impression = case_when(
+    Impression == "Sympathique" ~ "Attractive",
+    Impression == "Bizarre" ~ "Awkward",
+    Impression == "Intelligente" ~ "Intelligent",
+    Impression == "Appreciable" ~ "Likeable",
+    Impression == "Confiance" ~ "Confident",
+    Impression == "Dominante" ~ "Dominant",
+    Impression == "Conversation" ~ "Conversation",
+    Impression == "Temps" ~ "Time",
+    Impression == "Voisin" ~ "Live nearby",
+    Impression == "Assis" ~ "Seated",
+    TRUE ~ Impression
+  ))
+
+ggplot(impressions_long, aes(x = Impression, y = Score, fill = Type)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") + 
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +
+  theme_minimal() +
+  labs(title = "First Impressions",
+       x = "First Impression",
+       y = "Mean Score") +
+  scale_fill_manual(
+    values = c("Patient" = "steelblue", "Healthy" = "orange"), 
+    labels = c("Patient" = "ISZ - no label", "Healthy" = "HC - no label")
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Dataset 2 - SCZ label 
+```{r}
+impressions_long_2 = result_1st_imp_2 %>%
+  pivot_longer(
+    cols = c(Sympathique, Bizarre, Intelligente, Appreciable, Confiance, Dominante, Conversation, Temps, Voisin, Assis), 
+    names_to = "Impression",
+    values_to = "Score"
+  ) %>%
+  mutate(Impression = case_when(
+    Impression == "Sympathique" ~ "Attractive",
+    Impression == "Bizarre" ~ "Awkward",
+    Impression == "Intelligente" ~ "Intelligent",
+    Impression == "Appreciable" ~ "Likeable",
+    Impression == "Confiance" ~ "Confident",
+    Impression == "Dominante" ~ "Dominant",
+    Impression == "Conversation" ~ "Conversation",
+    Impression == "Temps" ~ "Time",
+    Impression == "Voisin" ~ "Live nearby",
+    Impression == "Assis" ~ "Seated",
+    TRUE ~ Impression 
+  ))
+
+ggplot(impressions_long_2, aes(x = Impression, y = Score, fill = Type)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") + 
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +
+  theme_minimal() +
+  labs(title = "First Impressions with label",
+       x = "First Impression",
+       y = "Mean Score") +
+  scale_fill_manual(
+    values = c("Patient" = "lightblue", "Healthy" = "gold"), 
+    labels = c("Patient" = "ISZ - label", "Healthy" = "HC - label")
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Dataset 3 - ASD label instead of SCZ 
+```{r}
+impressions_long_3 = result_1st_imp_3 %>%
+  pivot_longer(
+    cols = c(Sympathique, Bizarre, Intelligente, Appreciable, Confiance, Dominante, Conversation, Temps, Voisin, Assis), 
+    names_to = "Impression",
+    values_to = "Score"
+  ) %>%
+  mutate(Impression = case_when(
+    Impression == "Sympathique" ~ "Attractive",
+    Impression == "Bizarre" ~ "Awkward",
+    Impression == "Intelligente" ~ "Intelligent",
+    Impression == "Appreciable" ~ "Likeable",
+    Impression == "Confiance" ~ "Confident",
+    Impression == "Dominante" ~ "Dominant",
+    Impression == "Conversation" ~ "Conversation",
+    Impression == "Temps" ~ "Time",
+    Impression == "Voisin" ~ "Live nearby",
+    Impression == "Assis" ~ "Seated",
+    TRUE ~ Impression 
+  ))
+
+ggplot(impressions_long_3, aes(x = Impression, y = Score, fill = Type)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") + 
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +
+  theme_minimal() +
+  labs(title = "First Impressions with ASD label",
+       x = "First Impression",
+       y = "Mean Score") +
+  scale_fill_manual(
+    values = c("Patient" = "turquoise4", "Healthy" = "tan"), 
+    labels = c("Patient" = "ISZ - ASD label", "Healthy" = "HC - label")
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+Combined of every dataset  
+```{r}
+impressions_long$Dataset = "Dataset_1"
+impressions_long_2$Dataset = "Dataset_2"
+impressions_long_3$Dataset = "Dataset_3"
+combined_impressions = bind_rows(impressions_long, impressions_long_2, impressions_long_3)
+
+
+ggplot(combined_impressions, aes(x = Impression, y = Score, fill = interaction(Type, Dataset))) +
+  stat_summary(fun = mean, geom = "bar", position = position_dodge(width = 0.9)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.9), width = 0.2) +
+  theme_minimal() +
+  labs(
+    title = "Barplot of First Impressions by Type and Label",
+    x = "First Impression",
+    y = "Mean Score"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Patient.Dataset_1" = "steelblue",
+      "Healthy.Dataset_1" = "orange",
+      "Healthy.Dataset_2" = "gold",
+      "Patient.Dataset_2" = "lightblue",
+      "Healthy.Dataset_3" = "tan",
+      "Patient.Dataset_3" = "turquoise4"
+    ),
+    labels = c(
+      "HC - no label",
+      "ISZ - no label",
+      "HC with label",
+      "ISZ with label",
+      "HC with label 2",
+      "ISZ with ASD label"
+    ),
+    name = "Group & Dataset"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+#### 5.1.2 Inferential statistics
+<a name="Inferential statistics"></a>
+
+```{r}
+attributes = c("Attractive", "Intelligent", "Awkward", "Confident", "Dominant", "Conversation", "Time", "Live Nearby", "Seated")
+post_hoc_results = list()
+
+combined_impressions$Type = factor(combined_impressions$Type)
+combined_impressions$Dataset = factor(combined_impressions$Dataset)
+combined_impressions$Impression = factor(combined_impressions$Impression)
+
+for (attr in attributes) {
+  filtered_data = combined_impressions[combined_impressions$Impression == attr, ]
+  if (nrow(filtered_data) > 0) {
+    model_attr = lmerTest::lmer(Score ~ interaction(Type, Dataset, Impression) + (1|CASE), data = filtered_data)
+    cat("Model summary for attribute:", attr, "\n")
+    print(summary(model_attr))
+    cat("\n")
+    emmeans_result = emmeans(model_attr, ~ interaction(Type, Dataset, Impression), adjust = "Tukey", CIs = TRUE, 
+                              pbkrtest.limit = 4800, lmerTest.limit = 4800, lmer.df = "satterthwaite")
+    post_hoc_comparisons = pairs(emmeans_result)
+    ci_post_hoc = confint(post_hoc_comparisons)
+    
+    model_attr_df = as.data.frame(post_hoc_comparisons)
+    ci_attr_df = as.data.frame(ci_post_hoc)
+    
+    model_attr_df$CI_lower = ci_attr_df$lower.CL
+    model_attr_df$CI_upper = ci_attr_df$upper.CL
+    
+    sigma_residual_attr = car::sigmaHat(model_attr)
+    model_attr_df$d = model_attr_df$estimate / sigma_residual_attr
+    
+    post_hoc_results[[attr]] = model_attr_df
+  } else {
+    cat("No data for attribute:", attr, "\n")
+  }
+}
+
+for (attr in attributes) {
+  cat("Post-hoc comparisons for attribute:", attr, "\n")
+  
+  if (!is.null(post_hoc_results[[attr]])) {
+    result_attr_df = post_hoc_results[[attr]]
+    result_attr_df_final = result_attr_df[, c("contrast", "estimate", "p.value", "CI_lower", "CI_upper", "d")]
+    
+    print(result_attr_df_final)
+    cat("\n")
+  } else {
+    cat("No results for attribute:", attr, "\n")
+  }
+}
+```
+
+```{r}
+combined_impressions$Type = factor(combined_impressions$Type)
+combined_impressions$Dataset = factor(combined_impressions$Dataset)
+combined_impressions$Impression = factor(combined_impressions$Impression)
+
+post_hoc_results = list()
+
+cat("Impressions disponibles dans les données:", unique(combined_impressions$Impression), "\n")
+
+for (attr in attributes) {
+  filtered_data = combined_impressions[combined_impressions$Impression == attr, ]
+  if (nrow(filtered_data) == 0) {
+    cat("Aucune donnée pour l'attribut:", attr, "\n")
+    next  
+  }
+
+  if (any(is.na(filtered_data$Score))) {
+    cat("Des valeurs manquantes ont été détectées pour Score dans l'attribut:", attr, "\n")
+    filtered_data = filtered_data[!is.na(filtered_data$Score), ] 
+  }
+  
+  model_attr = tryCatch({
+    lmerTest::lmer(Score ~ interaction(Type, Dataset, Impression) + (1|CASE), data = filtered_data)
+  }, error = function(e) {
+    cat("Erreur dans l'ajustement du modèle pour l'attribut:", attr, "\n")
+    return(NULL)
+  })
+  
+  if (is.null(model_attr)) next  
+  
+  cat("Model summary for attribute:", attr, "\n")
+  print(summary(model_attr))
+  cat("\n")
+  
+  emmeans_result = emmeans(model_attr, ~ interaction(Type, Dataset, Impression), adjust = "Tukey", CIs = TRUE, 
+                            pbkrtest.limit = 4800, lmerTest.limit = 4800, lmer.df = "satterthwaite")
+  
+  post_hoc_comparisons = pairs(emmeans_result)
+  ci_post_hoc = confint(post_hoc_comparisons)
+  
+  model_attr_df = as.data.frame(post_hoc_comparisons)
+  ci_attr_df = as.data.frame(ci_post_hoc)
+  
+  model_attr_df$CI_lower = ci_attr_df$lower.CL
+  model_attr_df$CI_upper = ci_attr_df$upper.CL
+  
+  sigma_residual_attr = car::sigmaHat(model_attr)
+  model_attr_df$d = model_attr_df$estimate / sigma_residual_attr
+  
+  post_hoc_results[[attr]] = model_attr_df
+}
+
+for (attr in attributes) {
+  cat("Post-hoc comparisons for attribute:", attr, "\n")
+  
+  if (!is.null(post_hoc_results[[attr]])) {
+    result_attr_df = post_hoc_results[[attr]]
+    
+    patient_vs_patient_comparisons = result_attr_df[grepl("Patient", result_attr_df$contrast) & 
+                                                    !grepl("Healthy", result_attr_df$contrast), ]
+    
+    if (nrow(patient_vs_patient_comparisons) == 0) {
+      cat("No 'Patient vs Patient' contrasts found.\n")
+    } else {
+      result_attr_df_final = patient_vs_patient_comparisons[, c("contrast", "estimate", "p.value", "CI_lower", "CI_upper", "d")]
+      print(result_attr_df_final)
+    }
+  } else {
+    cat("No results for attribute:", attr, "\n")
+  }
+  
+  cat("\n")
+}
+```
+
+
+
+### 5.2 Analyze total score 
+<a name="Analyze total score"></a>
+
+#### 5.2.1 Descriptive
+<a name="Descriptive"></a>
+
+Dataset 1 - no label 
+```{r}
+items = c("Sympathique", "Bizarre", "Intelligente", "Appreciable", "Confiance", 
+           "Dominante", "Conversation", "Temps", "Voisin", "Assis")
+
+result_1st_imp = result_1st_imp %>%
+  mutate(
+    Bizarre_inversed = 102 - Bizarre,
+    Total_score = Sympathique + Bizarre_inversed + Intelligente + Appreciable + 
+                  Confiance + Dominante + Conversation + Temps + Voisin + Assis
+  )
+
+ggplot(result_1st_imp, aes(x = Type, y = Total_score, fill = Type)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") + 
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +  
+  theme_minimal() + 
+  labs(title = "Total First Impression Scores by Type",
+       x = "Type of Participant",
+       y = "Total Score") +
+  scale_fill_manual(
+    values = c("Patient" = "steelblue", "Healthy" = "orange"), 
+    labels = c("Patient" = "ISZ - no label", "Healthy" = "HC - no label")
+  )
+```
+
+Dataset 2 - Label SCZ 
+```{r}
+items = c("Sympathique", "Bizarre", "Intelligente", "Appreciable", "Confiance", 
+           "Dominante", "Conversation", "Temps", "Voisin", "Assis")
+
+result_1st_imp_2 = result_1st_imp_2 %>%
+  mutate(
+    Bizarre_inversed = 102 - Bizarre,
+    Total_score = Sympathique + Bizarre_inversed + Intelligente + Appreciable + 
+                  Confiance + Dominante + Conversation + Temps + Voisin + Assis
+  )
+
+ggplot(result_1st_imp_2, aes(x = Type, y = Total_score, fill = Type)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") +  
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +  
+  theme_minimal() + 
+  labs(title = "Total First Impression Scores by Type - ISZ label",
+       x = "Type of Participant",
+       y = "Total Score") +
+  scale_fill_manual(
+    values = c("Patient" = "lightblue", "Healthy" = "gold"), 
+    labels = c("Patient" = "ISZ - label", "Healthy" = "HC - label")
+  )
+```
+
+Dataset 3 - Label ASD instead of SCZ 
+```{r}
+items = c("Sympathique", "Bizarre", "Intelligente", "Appreciable", "Confiance", 
+           "Dominante", "Conversation", "Temps", "Voisin", "Assis")
+
+result_1st_imp_3 = result_1st_imp_3 %>%
+  mutate(
+    Bizarre_inversed = 102 - Bizarre,
+    Total_score = Sympathique + Bizarre_inversed + Intelligente + Appreciable + 
+                  Confiance + Dominante + Conversation + Temps + Voisin + Assis
+  )
+
+ggplot(result_1st_imp_3, aes(x = Type, y = Total_score, fill = Type)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") +  
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +  
+  theme_minimal() + 
+  labs(title = "Total First Impression Scores by Type - ASD label",
+       x = "Type of Participant",
+       y = "Total Score") +
+  scale_fill_manual(
+    values = c("Patient" = "turquoise4", "Healthy" = "tan"), 
+    labels = c("Patient" = "ISZ - ASD label", "Healthy" = "HC - label") 
+  )
+```
+
+
+Every dataset combined 
+```{r}
+result_1st_imp$Dataset = "Dataset_1"
+result_1st_imp_2$Dataset = "Dataset_2"
+result_1st_imp_3$Dataset = "Dataset_3"
+combined_results = bind_rows(result_1st_imp, result_1st_imp_2, result_1st_imp_3)
+
+combined_results$Interaction_Factor = factor(
+  interaction(combined_results$Type, combined_results$Dataset),
+  levels = c(
+    "Healthy.Dataset_1", "Patient.Dataset_1",
+    "Healthy.Dataset_2", "Patient.Dataset_2",
+    "Healthy.Dataset_3", "Patient.Dataset_3"
+  )
+)
+
+full_plot = ggplot(combined_results, aes(x = Dataset, y = Total_score, fill = Interaction_Factor)) +
+  stat_summary(fun = mean, geom = "bar", position = position_dodge(width = 0.9)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(width = 0.9), width = 0.2) +
+  theme_minimal() + 
+  labs(
+    title = "First Impression Scores",
+    x = "Experimental condition",
+    y = "Total Score"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Healthy.Dataset_1" = "orange",
+      "Patient.Dataset_1" = "steelblue",
+      "Healthy.Dataset_2" = "gold",
+      "Patient.Dataset_2" = "lightblue",
+      "Healthy.Dataset_3" = "tan",
+      "Patient.Dataset_3" = "turquoise4"
+    ),
+    labels = c(
+      "Healthy.Dataset_1" = "HC - no label",
+      "Patient.Dataset_1" = "ISZ - no label",
+      "Healthy.Dataset_2" = "HC - with label",
+      "Patient.Dataset_2" = "ISZ - with label",
+      "Healthy.Dataset_3" = "HC - with label",
+      "Patient.Dataset_3" = "ISZ - ASD label"
+    ),
+    name = "Group & Dataset"
+  ) +
+  scale_x_discrete(
+    labels = c("Dataset_1" = "no label", "Dataset_2" = "with label", "Dataset_3" = "mislabeled with ASD label")
+  ) 
+
+full_plot
+```
+
+
+#### 5.2.2 Inferential statistics
+<a name="Inferential statistics"></a>
+
+```{r}
+model = lmerTest::lmer(Total_score ~ interaction(Type, Dataset) + (1|CASE), data = combined_results)
+summary(model)
+
+emmeans_result = emmeans(model, ~ interaction(Type, Dataset), adjust = "Tukey", CIs = TRUE, 
+                          pbkrtest.limit = 4800, lmerTest.limit = 4800, lmer.df = "satterthwaite")
+summary(emmeans_result)
+
+post_hoc_comparisons = pairs(emmeans_result)
+summary(post_hoc_comparisons)
+ci_post_hoc = confint(post_hoc_comparisons)
+
+model_df = as.data.frame(post_hoc_comparisons)
+ci_df = as.data.frame(ci_post_hoc)
+
+model_df$CI_lower = ci_df$lower.CL
+model_df$CI_upper = ci_df$upper.CL
+
+sigma_residual = car::sigmaHat(model)
+
+model_df$d = model_df$estimate / sigma_residual
+
+model_df$Contrast = paste(model_df$contrast)  
+final_results = model_df[, c("Contrast", "estimate", "p.value", "CI_lower", "CI_upper", "d")]
+
+print(final_results)
+```
+
+
+## 6. Correlations 
+<a name="Correlations"></a>
+
+### 6.1 Movements
+<a name="Movements"></a>
+```{r}
+result_1st_imp$source = "result_1st_imp"
+result_1st_imp_2$source = "result_1st_imp_2"
+combined_result = rbind(result_1st_imp, result_1st_imp_2)
+
+```
+
+```{r}
+correlation_data = combined_result %>%
+  dplyr::select(
+    Total_score,      
+    stimuli_expressivity, 
+  )
+
+au_columns = c("stimuli_AU01_r", "stimuli_AU02_r", "stimuli_AU04_r", "stimuli_AU05_r", 
+               "stimuli_AU06_r", "stimuli_AU07_r", "stimuli_AU09_r", "stimuli_AU10_r", 
+               "stimuli_AU12_r", "stimuli_AU14_r", "stimuli_AU15_r", "stimuli_AU17_r", 
+               "stimuli_AU20_r", "stimuli_AU23_r", "stimuli_AU25_r", "stimuli_AU26_r", 
+               "stimuli_AU45_r")
+
+correlation_data = combined_result %>%
+  dplyr::select(Total_score, all_of(au_columns)) 
+
+correlation_with_pvalue = function(x, y) {
+  test = cor.test(x, y, method = "pearson")
+  return(c(correlation = test$estimate, p_value = test$p.value))
+}
+
+results_movements = list()
+for (col in colnames(correlation_data)[-1]) {  
+  result = correlation_with_pvalue(correlation_data$Total_score, correlation_data[[col]])
+  if (result[2] < 0.05) {  
+    results_movements[[col]] = list(correlation = result[1], p_value = result[2])
+  }
+}
+
+cat("Corrélations significatives avec Total_score:\n")
+for (item in names(results_movements)) {
+  cat(paste(item, ":", "corrélation =", results_movements[[item]]$correlation, 
+            ", p-value =", results_movements[[item]]$p_value, "\n"))
+}
+
+```
+```{r}
+# Quartile
+for (item in names(results_movements)) {
+  plot_data = correlation_data %>%
+    dplyr::select(Total_score, all_of(item)) %>%
+    rename(variable_score = all_of(item)) %>%
+    mutate(variable_group = ntile(variable_score, 4)) %>%  
+    group_by(variable_group) %>%
+    summarize(mean_total_score = mean(Total_score, na.rm = TRUE), .groups = "drop")
+  
+  plot = ggplot(plot_data, aes(x = factor(variable_group), y = mean_total_score)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    labs(
+      title = paste("Mean Total Score by", item, "group (Quartiles)"),
+      x = paste(item, "groups (quartiles)"),
+      y = "Mean Total Score"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+    coord_cartesian(ylim = c(300, 600))  
+  print(plot)
+}
+
+```
+
+
+```{r}
+# plot 
+for (item in names(results_movements)) {
+  plot_data = correlation_data %>%
+    dplyr::select(Total_score, all_of(item)) %>%
+    rename(variable_score = all_of(item))
+  
+  plot = ggplot(plot_data, aes(x = variable_score, y = Total_score)) +
+    geom_point(alpha = 0.5, color = "steelblue") +
+    geom_smooth(method = "lm", color = "red", se = FALSE) +
+    labs(
+      title = paste("Correlation between Total Score and", item),
+      x = item,
+      y = "Total Score"
+    ) +
+    theme_minimal()
+  
+  print(plot)
+}
+```
+
+### 6.2 Patients symptoms
+<a name="Patients symptoms"></a>
+
+Correlations
+```{r}
+patient_data = combined_result %>%
+  dplyr::filter(Type == "Patient") %>%
+  dplyr::select(
+    Total_score, 
+    stimuli_age,
+    stimuli_diagnostic,
+    stimuli_PANSS_tot,
+    stimuli_PANSS_pos,
+    stimuli_PANSS_neg,
+    stimuli_PANSS_gen,
+    stimuli_med
+  )
+
+correlation_with_pvalue = function(x, y) {
+  test = cor.test(x, y, method = "pearson")
+  return(list(correlation = test$estimate, p_value = test$p.value))  # Retourne une liste
+}
+
+results_total_score = list()
+results_other_items = list()
+
+for (col in colnames(patient_data)[-1]) {  
+  result = correlation_with_pvalue(patient_data$Total_score, patient_data[[col]])
+  if (result[2] < 0.05) {  
+    results_total_score[[col]] = list(correlation = result[1], p_value = result[2])
+  }
+}
+
+cat("Corrélations significatives avec Total_score:\n")
+for (item in names(results_total_score)) {
+  cat(paste(item, ":", "corrélation =", results_total_score[[item]]$correlation, 
+            ", p-value =", results_total_score[[item]]$p_value, "\n"))
+}
+```
+
+Plot
+```{r}
+if (length(results_total_score) > 0) {
+  for (variable in names(results_total_score)) {
+    p = ggplot(patient_data, aes_string(x = variable, y = "Total_score")) +
+      geom_point(color = "blue", alpha = 0.6) + 
+      geom_smooth(method = "lm", color = "red", se = FALSE) +  
+      labs(title = paste("Régression de Total_score sur", variable),
+           x = variable, 
+           y = "Total_score") +
+      theme_minimal()
+    
+    print(p)
+  }
+} else {
+  cat("Aucune variable n'est significativement corrélée avec Total_score.\n")
+}
+```
+
+
+With AU12, AU25, AU26
+```{r}
+significant_vars = list() 
+
+for (col in colnames(patient_data)[-1]) {  
+  result = correlation_with_pvalue(patient_data$Total_score, patient_data[[col]])
+  if (result$p_value < 0.05) {  
+    significant_vars[[col]] = result
+  }
+}
+
+cat("Variables significativement corrélées avec Total_score:\n")
+for (item in names(significant_vars)) {
+  cat(paste(item, ":", "corrélation =", significant_vars[[item]]$correlation, 
+            ", p-value =", significant_vars[[item]]$p_value, "\n"))
+}
+
+if (length(significant_vars) > 0) {
+  selected_vars = names(significant_vars)
+  patient_data_selected <- combined_result %>%
+    filter(Type == "Patient") %>%
+    select(all_of(selected_vars), stimuli_AU12_r, stimuli_AU25_r, stimuli_AU26_r)
+  correlation_matrix = matrix(NA, ncol = length(selected_vars), nrow = length(selected_vars),
+                               dimnames = list(selected_vars, selected_vars))
+
+  p_value_matrix <- correlation_matrix  
+  for (i in selected_vars) {
+    for (j in selected_vars) {
+      if (i != j) {
+        result = correlation_with_pvalue(patient_data_selected[[i]], patient_data_selected[[j]])
+        correlation_matrix[i, j] = result$correlation
+        p_value_matrix[i, j] = result$p_value
+      }
+    }
+  }
+  
+  cat("\nMatrice des corrélations entre les variables significatives:\n")
+  print(correlation_matrix)
+
+  cat("\nMatrice des p-values entre les variables significatives:\n")
+  print(p_value_matrix)
+  
+  au_vars = c("stimuli_AU12_r", "stimuli_AU25_r", "stimuli_AU26_r")
+  correlation_results_au = data.frame(Variable = character(), AU = character(),
+                                       Correlation = numeric(), P_Value = numeric(),
+                                       stringsAsFactors = FALSE)
+
+  for (var in selected_vars) {
+    for (au in au_vars) {
+      result = correlation_with_pvalue(patient_data_selected[[var]], patient_data_selected[[au]])
+      correlation_results_au = rbind(correlation_results_au, 
+                                      data.frame(Variable = var, AU = au,
+                                                 Correlation = result$correlation, 
+                                                 P_Value = result$p_value))
+    }
+  }
+
+  cat("\nCorrélations entre les variables significatives et AU12, AU25, AU26:\n")
+  print(correlation_results_au)
+} else {
+  cat("\nAucune variable n'est significativement corrélée avec Total_score.\n")
+}
+```
+```{r}
+au_vars = c("stimuli_AU12_r", "stimuli_AU25_r", "stimuli_AU26_r")
+
+cat("\nGraphes de régression entre les variables significatives et AU12, AU25, AU26:\n")
+for (var in selected_vars) {
+  for (au in au_vars) {
+    result = correlation_with_pvalue(patient_data_selected[[var]], patient_data_selected[[au]])
+    
+    if (result$p_value < 0.05) { 
+      p = ggplot(patient_data_selected, aes_string(x = var, y = au)) +
+        geom_point(color = "darkgreen", alpha = 0.6) + 
+        geom_smooth(method = "lm", color = "red", se = FALSE) +  
+        labs(title = paste("Régression de", au, "sur", var),
+             x = var, 
+             y = au) +
+        theme_minimal()
+      
+      print(p)  
+    }
+  }
+}
+```
+
+
+
+Plot
+```{r}
+grouped_data = combined_result %>%
+  dplyr::filter(Type == "Patient") %>%
+  dplyr::mutate(
+    stimuli_med_group = cut(
+      stimuli_med, 
+      breaks = seq(0, max(stimuli_med, na.rm = TRUE) + 30, by = 30), 
+      include.lowest = TRUE, 
+      right = FALSE
+    )
+  ) %>%
+  dplyr::group_by(stimuli_med_group) %>%
+  dplyr::summarize(mean_total_score = mean(Total_score, na.rm = TRUE)) %>%
+  dplyr::ungroup()
+
+barplot = ggplot(grouped_data, aes(x = stimuli_med_group, y = mean_total_score)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(
+    title = "Mean Total Score by stimuli_med group (Patients only)",
+    x = "Chlorpromazine equivalent ranged by 50 (mg)",
+    y = "Mean Total Score"
+  ) +
+  coord_cartesian(ylim = c(300, 600)) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+print(barplot)
+```
+
+Stimuli_diagnostic = length of diagnostic
+
+Correlations
+```{r}
+patient_data_PANSS = combined_result %>%
+  dplyr::filter(Type == "Patient") %>%
+  dplyr::select(
+    Total_score,  
+    dplyr::starts_with("stimuli_PANSS_")
+  )
+
+correlation_with_pvalue = function(x, y) {
+  test = cor.test(x, y, method = "pearson")
+  return(c(correlation = test$estimate, p_value = test$p.value))
+}
+
+results_total_score = list()
+results_other_items = list()
+
+for (col in colnames(patient_data_PANSS)[-1]) {  
+  result = correlation_with_pvalue(patient_data_PANSS$Total_score, patient_data_PANSS[[col]])
+  if (result[2] < 0.05) {  
+    results_total_score[[col]] = list(correlation = result[1], p_value = result[2])
+  }
+}
+
+
+cat("Corrélations significatives avec Total_score:\n")
+for (item in names(results_total_score)) {
+  cat(paste(item, ":", "corrélation =", results_total_score[[item]]$correlation, 
+            ", p-value =", results_total_score[[item]]$p_value, "\n"))
+}
+```
+Plot: 
+```{r}
+for (item in names(results_total_score)) {
+  plot_data = patient_data_PANSS %>%
+    dplyr::select(Total_score, all_of(item)) %>%
+    rename(PANSS_score = all_of(item)) %>%
+    mutate(PANSS_group = as.factor(PANSS_score)) %>%
+    group_by(PANSS_group) %>%
+    summarize(mean_total_score = mean(Total_score, na.rm = TRUE), .groups = "drop")
+  
+  plot = ggplot(plot_data, aes(x = PANSS_group, y = mean_total_score)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    labs(
+      title = paste("Mean Total Score by", item, "groups"),
+      x = paste(item, "groups (1 to 7)"),
+      y = "Mean Total Score"
+    ) +
+    coord_cartesian(ylim = c(300, 600)) +  # Zoom sur l'axe des ordonnées
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(plot)
+}
+```
+
+
+### Additional graph 
+```{r}
+impressions_long_patient = result_1st_imp %>%
+  filter(Type == "Patient") %>%
+  pivot_longer(
+    cols = c(Sympathique, Bizarre, Intelligente, Appreciable, Confiance, Dominante, Conversation, Temps, Voisin, Assis), 
+    names_to = "Impression",
+    values_to = "Score"
+  ) %>%
+  mutate(Impression = case_when(
+    Impression == "Sympathique" ~ "Attractive",
+    Impression == "Bizarre" ~ "Awkward",
+    Impression == "Intelligente" ~ "Intelligent",
+    Impression == "Appreciable" ~ "Likeable",
+    Impression == "Confiance" ~ "Confident",
+    Impression == "Dominante" ~ "Dominant",
+    Impression == "Conversation" ~ "Conversation",
+    Impression == "Temps" ~ "Time",
+    Impression == "Voisin" ~ "Live Nearby",
+    Impression == "Assis" ~ "Seated",
+    TRUE ~ Impression
+  ))
+
+impressions_long_patient_2 = result_1st_imp_2 %>%
+  filter(Type == "Patient") %>%
+  pivot_longer(
+    cols = c(Sympathique, Bizarre, Intelligente, Appreciable, Confiance, Dominante, Conversation, Temps, Voisin, Assis), 
+    names_to = "Impression",
+    values_to = "Score"
+  ) %>%
+  mutate(Impression = case_when(
+    Impression == "Sympathique" ~ "Attractive",
+    Impression == "Bizarre" ~ "Awkward",
+    Impression == "Intelligente" ~ "Intelligent",
+    Impression == "Appreciable" ~ "Likeable",
+    Impression == "Confiance" ~ "Confident",
+    Impression == "Dominante" ~ "Dominant",
+    Impression == "Conversation" ~ "Conversation",
+    Impression == "Temps" ~ "Time",
+    Impression == "Voisin" ~ "Live Nearby",
+    Impression == "Assis" ~ "Seated",
+    TRUE ~ Impression 
+  ))
+
+impressions_patient_combined = bind_rows(
+  impressions_long_patient %>% mutate(Dataset = "Dataset 1"),
+  impressions_long_patient_2 %>% mutate(Dataset = "Dataset 2")
+)
+
+item_plot= ggplot(impressions_patient_combined, aes(x = Impression, y = Score, fill = Dataset)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") + 
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", position = position_dodge(0.9), width = 0.2) +
+  theme_minimal() +
+  labs(title = "Ratings of first impression for individuals with schizophrenia with and without diagnosis disclosure",
+       x = "First impression",
+       y = "Average score") +
+  scale_fill_manual(
+    values = c("Dataset 1" = "steelblue", "Dataset 2" = "lightblue"),  
+    labels = c("Dataset 1" = "ISZ - no label", "Dataset 2" = "ISZ - with label")
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 10)
+        )
+
+item_plot
+```
+
+
+
+### Saving
+```{r}
+setwd(RES_PATH)
+ggsave("full_plot.png", plot = full_plot, width = 8, height = 6, dpi = 300)
+ggsave("item_plot.png", plot = item_plot, width = 8, height = 6, dpi = 300)
+```
+

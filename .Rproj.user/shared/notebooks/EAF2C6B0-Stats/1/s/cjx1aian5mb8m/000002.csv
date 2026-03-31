@@ -1,0 +1,38 @@
+"0","```r
+impressions_long$Dataset = \"Dataset_1\"
+impressions_long_2$Dataset = \"Dataset_2\"
+impressions_long_3$Dataset = \"Dataset_3\"
+combined_impressions = bind_rows(impressions_long, impressions_long_2, impressions_long_3)
+
+
+ggplot(combined_impressions, aes(x = Impression, y = Score, fill = interaction(Type, Dataset))) +
+  stat_summary(fun = mean, geom = \"bar\", position = position_dodge(width = 0.9)) +
+  stat_summary(fun.data = mean_cl_boot, geom = \"errorbar\", position = position_dodge(width = 0.9), width = 0.2) +
+  theme_minimal() +
+  labs(
+    title = \"Barplot of First Impressions by Type and Label\",
+    x = \"First Impression\",
+    y = \"Mean Score\"
+  ) +
+  scale_fill_manual(
+    values = c(
+      \"Patient.Dataset_1\" = \"steelblue\",
+      \"Healthy.Dataset_1\" = \"orange\",
+      \"Healthy.Dataset_2\" = \"gold\",
+      \"Patient.Dataset_2\" = \"lightblue\",
+      \"Healthy.Dataset_3\" = \"tan\",
+      \"Patient.Dataset_3\" = \"turquoise4\"
+    ),
+    labels = c(
+      \"HC - no label\",
+      \"ISZ - no label\",
+      \"HC with label\",
+      \"ISZ with label\",
+      \"HC with label 2\",
+      \"ISZ with ASD label\"
+    ),
+    name = \"Group & Dataset\"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```"
