@@ -15,7 +15,7 @@
 import numpy as np
 import pandas as pd
 
-from config import ALL_SIGNAL_NAMES, FS
+from .config import ALL_SIGNAL_NAMES, FS
 
 
 # =============================================================================

@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import butter, filtfilt
 
-from config import LM, ALL_SIGNAL_NAMES, CUTOFF, FS, ORDER
+from .config import LM, ALL_SIGNAL_NAMES, CUTOFF, FS, ORDER
 
 
 # =============================================================================
