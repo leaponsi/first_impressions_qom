@@ -511,29 +511,3 @@ emm_items <- emmeans(model_items, ~ Type | Impression)
 pairs(emm_items, adjust = "tukey")
 
 
-
-# Movement analysis
-
-library(readr)
-library(dplyr)
-
-df <- read_csv("results/movement.csv")
-
-df %>%
-  group_by(group) %>%
-  summarise(
-    overall_motion = mean(`Overall motion amplitude sum`, na.rm = TRUE),
-    overall_quantity = mean(`Overall motion quantity`, na.rm = TRUE)
-  )
-  
-t.test(`Overall motion amplitude sum` ~ group, data = df)
-
-t.test
-
-df %>%
-  group_by(group) %>%
-  summarise(
-    head_motion = mean(`Head turn_amplitude_sum`, na.rm = TRUE),
-    hand_motion = mean(`Right hand horizontal_amplitude_sum`, na.rm = TRUE)
-  )
-  
