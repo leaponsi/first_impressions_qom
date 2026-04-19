@@ -1,0 +1,71 @@
+---
+title: "Movement Metrics and First Impressions"
+output: rmarkdown::notebook
+---
+
+## Objective
+
+This notebook links movement metrics to first-impression ratings. It computes aggregated movement metrics, correlations with first-impression scores, and mixed models including the aggregated movement predictors.
+
+```{r}
+library(readr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(lme4)
+library(lmerTest)
+library(car)
+library(knitr)
+library(tibble)
+```
+
+```{r}
+dir.create("../results", showWarnings = FALSE)
+
+source("../sources/stat_helpers.R")
+source("../sources/questionnaire_analysis.R")
+source("../sources/stimuli_manip_check.R")
+source("../sources/movement_statistics.R")
+```
+
+```{r}
+data_imp <- read_csv("../data/data_imp.csv", show_col_types = FALSE)
+movement_features <- read_csv(
+  "../data/all_participants_movement_features.csv",
+  show_col_types = FALSE
+)
+stimuli_info <- read_stimuli_participants("../data/stimuli_participants.csv")
+```
+
+```{r}
+metric_impression_correlations <- build_metric_impression_correlations(
+  questionnaire_df = data_imp,
+  features_df = movement_features,
+  stimuli_df = stimuli_info
+)
+
+print(metric_impression_correlations)
+```
+
+```{r}
+movement_model_outputs <- fit_total_movement_models(
+  questionnaire_df = data_imp,
+  features_df = movement_features,
+  stimuli_df = stimuli_info
+)
+
+print(movement_model_outputs$fixed_effects)
+print(movement_model_outputs$anovas)
+```
+
+```{r}
+write_csv(metric_impression_correlations, "../results/metric_impression_correlations.csv")
+write_csv(
+  movement_model_outputs$fixed_effects,
+  "../results/mixed_models_with_total_movement_predictors.csv"
+)
+write_csv(
+  movement_model_outputs$anovas,
+  "../results/mixed_models_with_total_movement_predictors_anova.csv"
+)
+```

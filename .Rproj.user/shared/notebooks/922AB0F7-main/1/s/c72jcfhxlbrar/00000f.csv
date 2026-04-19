@@ -1,0 +1,7 @@
+"0","results_corr %>%"
+"0","  filter(p_signif != ""ns"") %>%"
+"0","  select(predictor, outcome, method, r, p_value, p_adjusted, p_signif) %>%"
+"0","  knitr::kable("
+"0","    caption = ""Significant correlations after FDR correction"","
+"0","    digits = 4"
+"0","  )"

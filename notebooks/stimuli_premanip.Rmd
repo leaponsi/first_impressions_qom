@@ -1,0 +1,39 @@
+---
+title: "Stimuli Participants - Premanip"
+output: rmarkdown::notebook
+---
+
+## Objective
+
+This notebook checks whether the two stimuli groups are matched on age, gender, and education.
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(knitr)
+library(tibble)
+```
+
+```{r}
+dir.create("../results", showWarnings = FALSE)
+
+source("../sources/stat_helpers.R")
+source("../sources/stimuli_manip_check.R")
+```
+
+```{r}
+stimuli_info <- read_stimuli_participants("../data/stimuli_participants.csv")
+
+stimuli_descriptives <- build_stimuli_descriptives(stimuli_info)
+stimuli_manip_check <- build_stimuli_manip_check(stimuli_info)
+
+print(stimuli_descriptives)
+print(stimuli_manip_check)
+```
+
+```{r}
+write_csv(stimuli_descriptives, "../results/stimuli_participants_descriptives.csv")
+write_csv(stimuli_manip_check, "../results/stimuli_participants_manip_check.csv")
+```
