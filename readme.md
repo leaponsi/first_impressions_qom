@@ -36,7 +36,7 @@ Rscript -e "rmarkdown::render('main.Rmd')"
 
 **Data:** 40 csv (20 healthy controls + 20 patients) of MediaPipe Pose extraction; 91 observer participants first impression of the two groups.
 
-**Key Results:** Movement metrics (Quantity of Motion, amplitude, speed) correlate with observer first impression ratings (r ≈ 0.40–0.45).
+**Key Results:** Movement metrics (Quantity of Motion, amplitude, speed) correlate with observer first impression ratings (R²=0.45).
 
 ## Running the Full Analysis
 
