@@ -1,9 +1,0 @@
-"0","```r
-setwd(RES_PATH)
-```"
-"1","Avis : The working directory was changed to C:/Users/mathilde.parisi/OneDrive - umontpellier.fr/Bureau/publi 1st imp/code/RES inside a notebook chunk. The working directory will be reset when the chunk is finished running. Use the knitr root.dir option in the setup chunk to change the working directory for notebook chunks.
-"
-"0","```r
-ggsave(\"full_plot.png\", plot = full_plot, width = 8, height = 6, dpi = 300)
-ggsave(\"item_plot.png\", plot = item_plot, width = 8, height = 6, dpi = 300)
-```"

@@ -7,18 +7,7 @@ library(dplyr)
 #' then reshapes it from wide format (1 row per observer) to long format
 #' (1 row per observer × video). Extracts impression ratings, behavioral intentions,
 #' and computes total scores.
-#'
-#' @param data Raw questionnaire data (from data_1st_imp.xlsx)
-#'
-#' @return data.frame in long format with columns:
-#'   - CASE: observer ID
-#'   - Age, Gender, Pro_Sante: observer demographics
-#'   - vid: video filename
-#'   - num_video: video number (1-10)
-#'   - Type: "Healthy" or "Patient" (stimulus participant type)
-#'   - Impression ratings: Sympathique, Bizarre, Intelligente, etc.
-#'   - Behavioral intentions: Conversation, Temps, Voisin, Assis
-#'   - Derived: Bizarre_inversed, Total_score
+
 organize_data <- function(data) {
   # Filter on attention check: only observers with AC03_01 > 90
   data <- data |>

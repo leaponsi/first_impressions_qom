@@ -1,0 +1,4 @@
+Variable,mean_QoM,mean_amplitude_sum,mean_mean_speed
+mean_QoM,1,0.94,0.92
+mean_amplitude_sum,0.94,1,0.99
+mean_mean_speed,0.92,0.99,1

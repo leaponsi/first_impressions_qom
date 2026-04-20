@@ -1,257 +1,264 @@
-aggregate_movement_totals <- function(features_df) {
+# -----------------------------------------------------------------------------
+# Movement statistics helpers
+#
+# Three global metrics per participant, computed by z-scoring each metric
+# within each movement (so every movement contributes equally, on the same
+# scale) and then averaging the z-scores across movements:
+#   mean_QoM, mean_amplitude_sum, mean_mean_speed
+# This protects against the bias that would arise from raw averaging when a
+# participant has fewer than 6 movements recorded (e.g. P10 and SZ4).
+#
+# Four functions:
+#   build_participant_metrics()          -> wide table, 1 row per participant,
+#                                           3 global metrics + group
+#   build_movement_descriptives()        -> M (SD) and N per group, per metric
+#   build_movement_correlation_matrix()  -> 3 x 3 correlation matrix
+#                                           (Pearson if all vars normal,
+#                                            Spearman otherwise)
+#   build_movement_group_differences()   -> CT vs SZ test per metric
+#                                           (Welch t-test if both groups normal,
+#                                            Wilcoxon otherwise)
+# -----------------------------------------------------------------------------
+
+# Global metric names (after averaging across the 6 movements)
+GLOBAL_METRICS <- c("mean_QoM", "mean_amplitude_sum", "mean_mean_speed")
+
+# Small helper: "M (SD)"
+fmt_msd <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA_character_)
+  sprintf("%.3f (%.3f)", mean(x), sd(x))
+}
+
+# Normality check used to pick parametric vs non-parametric test
+is_normal <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) < 3 || length(x) > 5000) return(FALSE)
+  stats::shapiro.test(x)$p.value > .05
+}
+
+# 0. Participant-level table: z-score each metric within each movement,
+#    then average the z-scores across the 6 movements.
+#    This weights each movement equally and avoids a bias when some
+#    movements are missing (hand_* missing for P10 and SZ4).
+build_participant_metrics <- function(features_df) {
   features_df |>
-    dplyr::group_by(participant_id, participant, group) |>
-    dplyr::summarise(
-      total_QoM = safe_sum(QoM),
-      total_amplitude_sum = safe_sum(amplitude_sum),
-      total_mean_speed = safe_sum(mean_speed),
-      n_available_movement_types = sum(
-        !is.na(QoM) | !is.na(amplitude_sum) | !is.na(mean_speed)
-      ),
-      .groups = "drop"
-    ) |>
+    dplyr::group_by(movement_type) |>
     dplyr::mutate(
-      z_total_QoM = as.numeric(scale(total_QoM)),
-      z_total_amplitude_sum = as.numeric(scale(total_amplitude_sum)),
-      z_total_mean_speed = as.numeric(scale(total_mean_speed))
+      z_QoM           = as.numeric(scale(QoM)),
+      z_amplitude_sum = as.numeric(scale(amplitude_sum)),
+      z_mean_speed    = as.numeric(scale(mean_speed))
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::group_by(participant_id, group) |>
+    dplyr::summarise(
+      mean_QoM           = mean(z_QoM,           na.rm = TRUE),
+      mean_amplitude_sum = mean(z_amplitude_sum, na.rm = TRUE),
+      mean_mean_speed    = mean(z_mean_speed,    na.rm = TRUE),
+      n_movements_used   = dplyr::n(),
+      .groups = "drop"
     )
 }
 
-prepare_analysis_dataset <- function(questionnaire_df, features_df, stimuli_df) {
-  movement_wide <- features_df |>
-    dplyr::select(participant_id, movement_type, QoM, amplitude_sum, mean_speed) |>
-    tidyr::pivot_wider(
-      names_from = movement_type,
-      values_from = c(QoM, amplitude_sum, mean_speed),
-      names_glue = "{movement_type}_{.value}"
-    )
+# 1. Descriptive table: M (SD) and N per group, per global metric
+build_movement_descriptives <- function(features_df) {
+  p_metrics <- build_participant_metrics(features_df)
 
-  movement_totals <- aggregate_movement_totals(features_df) |>
-    dplyr::select(
-      participant_id,
-      total_QoM, total_amplitude_sum, total_mean_speed,
-      n_available_movement_types,
-      z_total_QoM, z_total_amplitude_sum, z_total_mean_speed
-    )
+  rows <- list()
+  for (met in GLOBAL_METRICS) {
+    x_ct <- p_metrics[[met]][p_metrics$group == "P"]
+    x_sz <- p_metrics[[met]][p_metrics$group == "SZ"]
 
-  prepare_questionnaire_scores(questionnaire_df) |>
-    dplyr::left_join(stimuli_df, by = "participant_id") |>
-    dplyr::left_join(movement_totals, by = "participant_id") |>
-    dplyr::left_join(movement_wide, by = "participant_id")
+    rows[[length(rows) + 1]] <- tibble::tibble(
+      Metric = met,
+      CT     = fmt_msd(x_ct),
+      SZ     = fmt_msd(x_sz),
+      N_CT   = sum(!is.na(x_ct)),
+      N_SZ   = sum(!is.na(x_sz))
+    )
+  }
+
+  dplyr::bind_rows(rows)
 }
 
+# 2. Correlation matrix of the 3 global metrics
+# Method chosen once for the whole matrix: Spearman if any metric is
+# non-normal, Pearson otherwise.
+build_movement_correlation_matrix <- function(features_df) {
+  p_metrics <- build_participant_metrics(features_df)
+  mat <- as.matrix(p_metrics[, GLOBAL_METRICS])
+
+  all_normal <- all(apply(mat, 2, is_normal))
+  method     <- if (all_normal) "pearson" else "spearman"
+
+  cor_mat <- stats::cor(mat, method = method, use = "pairwise.complete.obs")
+
+  attr(cor_mat, "method") <- method
+  cor_mat
+}
+
+# 3. Group comparisons CT vs SZ on the 3 global metrics
 build_movement_group_differences <- function(features_df) {
-  movement_metric_results <- list()
+  p_metrics <- build_participant_metrics(features_df)
 
-  for (movement_name in sort(unique(features_df$movement_type))) {
-    movement_sub <- features_df |>
-      dplyr::filter(movement_type == movement_name)
+  rows <- list()
+  for (met in GLOBAL_METRICS) {
+    x_ct <- p_metrics[[met]][p_metrics$group == "P"]
+    x_sz <- p_metrics[[met]][p_metrics$group == "SZ"]
+    x_ct <- x_ct[!is.na(x_ct)]
+    x_sz <- x_sz[!is.na(x_sz)]
 
-    for (metric_name in c("QoM", "amplitude_sum", "mean_speed")) {
-      x <- movement_sub[[metric_name]][movement_sub$group == "P"]
-      y <- movement_sub[[metric_name]][movement_sub$group == "SZ"]
-
-      x <- x[!is.na(x)]
-      y <- y[!is.na(y)]
-
-      test_res <- stats::wilcox.test(x, y, exact = FALSE)
-      delta <- compute_cliffs_delta(x, y)
-
-      movement_metric_results[[length(movement_metric_results) + 1]] <- tibble::tibble(
-        movement_type = movement_name,
-        metric = metric_name,
-        n_P = length(x),
-        n_SZ = length(y),
-        mean_P = mean(x),
-        mean_SZ = mean(y),
-        median_P = stats::median(x),
-        median_SZ = stats::median(y),
-        p_value = test_res$p.value,
-        cliffs_delta = delta,
-        effect_size = label_cliffs_delta(delta)
-      )
+    if (is_normal(x_ct) && is_normal(x_sz)) {
+      test_res  <- stats::t.test(x_ct, x_sz, var.equal = FALSE)
+      test_name <- "Welch t-test"
+      stat_val  <- unname(test_res$statistic)
+    } else {
+      test_res  <- stats::wilcox.test(x_ct, x_sz, exact = FALSE)
+      test_name <- "Wilcoxon rank-sum"
+      stat_val  <- unname(test_res$statistic)
     }
+
+    rows[[length(rows) + 1]] <- tibble::tibble(
+      Metric    = met,
+      CT        = fmt_msd(x_ct),
+      SZ        = fmt_msd(x_sz),
+      Test      = test_name,
+      Statistic = stat_val,
+      p         = test_res$p.value
+    )
   }
 
-  dplyr::bind_rows(movement_metric_results) |>
-    dplyr::mutate(
-      p_adj = stats::p.adjust(p_value, method = "holm"),
-      sig = dplyr::case_when(
-        p_adj < .001 ~ "***",
-        p_adj < .01 ~ "**",
-        p_adj < .05 ~ "*",
-        TRUE ~ ""
-      )
-    ) |>
-    dplyr::select(
-      movement_type, metric, n_P, n_SZ,
-      mean_P, mean_SZ, median_P, median_SZ,
-      p_value, p_adj, sig, cliffs_delta, effect_size
-    )
+  dplyr::bind_rows(rows)
 }
 
-build_stimulus_level_dataset <- function(questionnaire_df, features_df, stimuli_df) {
-  analysis_data <- prepare_analysis_dataset(questionnaire_df, features_df, stimuli_df)
+# 4. Prepare plot data for group comparison figure
+build_movement_plot_data <- function(features_df) {
+  
+  p_metrics <- build_participant_metrics(features_df)
+  
+  plot_data <- p_metrics |>
+    dplyr::select(group, mean_QoM, mean_amplitude_sum, mean_mean_speed) |>
+    tidyr::pivot_longer(
+      cols = -group,
+      names_to = "Metric",
+      values_to = "Value"
+    ) |>
+    dplyr::mutate(
+      group = dplyr::recode(group, "P" = "CT", "SZ" = "SZ"),
+      Metric = dplyr::recode(
+        Metric,
+        mean_QoM = "QoM",
+        mean_amplitude_sum = "Amplitude sum",
+        mean_mean_speed = "Mean speed"
+      )
+    )
+  
+  return(plot_data)
+}
 
-  analysis_data |>
-    dplyr::group_by(participant_id, vid, Type) |>
-    dplyr::summarise(
-      FirstImpression_total = mean(FirstImpression_total, na.rm = TRUE),
-      InteractionIntent_total = mean(InteractionIntent_total, na.rm = TRUE),
-      Global_total = mean(Global_total, na.rm = TRUE),
-      dplyr::across(
-        c(
-          total_QoM, total_amplitude_sum, total_mean_speed,
-          dplyr::ends_with("_QoM"),
-          dplyr::ends_with("_amplitude_sum"),
-          dplyr::ends_with("_mean_speed")
-        ),
-        ~ if (all(is.na(.x))) NA_real_ else dplyr::first(stats::na.omit(.x)),
-        .names = "{.col}"
+
+# 5. Build annotation table for significance labels
+build_movement_plot_annotations <- function(features_df) {
+  
+  group_diff <- build_movement_group_differences(features_df)
+  
+  annotation_df <- group_diff |>
+    dplyr::mutate(
+      Metric = dplyr::recode(
+        Metric,
+        mean_QoM = "QoM",
+        mean_amplitude_sum = "Amplitude sum",
+        mean_mean_speed = "Mean speed"
       ),
+      p_label = dplyr::case_when(
+        p < .001 ~ "***",
+        p < .01  ~ "**",
+        p < .05  ~ "*",
+        TRUE     ~ "ns"
+      )
+    ) |>
+    dplyr::select(Metric, p, p_label)
+  
+  return(annotation_df)
+}
+
+
+# 6. Plot group differences on global movement metrics
+plot_movement_group_differences <- function(features_df) {
+  
+  plot_data <- build_movement_plot_data(features_df)
+  annotation_df <- build_movement_plot_annotations(features_df)
+  
+  y_pos <- plot_data |>
+    dplyr::group_by(Metric) |>
+    dplyr::summarise(
+      y = max(Value, na.rm = TRUE) + 0.20 * diff(range(Value, na.rm = TRUE)),
+      y_line = max(Value, na.rm = TRUE) + 0.10 * diff(range(Value, na.rm = TRUE)),
       .groups = "drop"
     )
-}
-
-build_metric_impression_correlations <- function(questionnaire_df, features_df, stimuli_df) {
-  stimulus_level_data <- build_stimulus_level_dataset(
-    questionnaire_df = questionnaire_df,
-    features_df = features_df,
-    stimuli_df = stimuli_df
-  )
-
-  metric_cols <- names(stimulus_level_data)[
-    grepl("(^total_)|(_QoM$)|(_amplitude_sum$)|(_mean_speed$)", names(stimulus_level_data))
-  ]
-  score_cols <- c("FirstImpression_total", "InteractionIntent_total", "Global_total")
-
-  correlation_results <- list()
-
-  for (metric_name in metric_cols) {
-    for (score_name in score_cols) {
-      sub <- stimulus_level_data |>
-        dplyr::select(dplyr::all_of(c(metric_name, score_name))) |>
-        dplyr::filter(!is.na(.data[[metric_name]]), !is.na(.data[[score_name]]))
-
-      if (nrow(sub) < 3) {
-        next
-      }
-
-      test_res <- suppressWarnings(
-        stats::cor.test(
-          sub[[metric_name]],
-          sub[[score_name]],
-          method = "spearman",
-          exact = FALSE
-        )
-      )
-
-      correlation_results[[length(correlation_results) + 1]] <- tibble::tibble(
-        metric = metric_name,
-        score = score_name,
-        n = nrow(sub),
-        rho = unname(test_res$estimate),
-        p_value = test_res$p.value
-      )
-    }
-  }
-
-  dplyr::bind_rows(correlation_results) |>
+  
+  annotation_df <- annotation_df |>
+    dplyr::left_join(y_pos, by = "Metric") |>
     dplyr::mutate(
-      p_adj = stats::p.adjust(p_value, method = "holm"),
-      sig = dplyr::case_when(
-        p_adj < .001 ~ "***",
-        p_adj < .01 ~ "**",
-        p_adj < .05 ~ "*",
-        TRUE ~ ""
-      )
-    ) |>
-    dplyr::arrange(p_adj, dplyr::desc(abs(rho)))
-}
-
-fit_total_movement_models <- function(questionnaire_df, features_df, stimuli_df) {
-  analysis_data_for_models <- prepare_analysis_dataset(
-    questionnaire_df = questionnaire_df,
-    features_df = features_df,
-    stimuli_df = stimuli_df
-  ) |>
-    dplyr::filter(
-      !is.na(z_total_QoM),
-      !is.na(z_total_amplitude_sum),
-      !is.na(z_total_mean_speed)
+      x1 = 1,
+      x2 = 2,
+      x_text = 1.5
     )
-
-  model_fi <- lme4::lmer(
-    FirstImpression_total ~ Type + num_video +
-      z_total_QoM + z_total_amplitude_sum + z_total_mean_speed +
-      (1 | CASE) + (1 | video_id),
-    data = analysis_data_for_models,
-    REML = FALSE
-  )
-
-  model_ii <- lme4::lmer(
-    InteractionIntent_total ~ Type + num_video +
-      z_total_QoM + z_total_amplitude_sum + z_total_mean_speed +
-      (1 | CASE) + (1 | video_id),
-    data = analysis_data_for_models,
-    REML = FALSE
-  )
-
-  model_global <- lme4::lmer(
-    Global_total ~ Type + num_video +
-      z_total_QoM + z_total_amplitude_sum + z_total_mean_speed +
-      (1 | CASE) + (1 | video_id),
-    data = analysis_data_for_models,
-    REML = FALSE
-  )
-
-  fixed_effects <- dplyr::bind_rows(
-    extract_fixed_effects(model_fi, "First impression total"),
-    extract_fixed_effects(model_ii, "Interaction intention total"),
-    extract_fixed_effects(model_global, "Global total")
-  ) |>
-    dplyr::filter(
-      Predictor %in% c(
-        "Type1", "num_video",
-        "z_total_QoM", "z_total_amplitude_sum", "z_total_mean_speed"
-      )
-    ) |>
-    dplyr::mutate(
-      Predictor = dplyr::recode(
-        Predictor,
-        Type1 = "Target type",
-        num_video = "Presentation order",
-        z_total_QoM = "Total QoM (z)",
-        z_total_amplitude_sum = "Total amplitude (z)",
-        z_total_mean_speed = "Total mean speed (z)"
-      ),
-      Estimate = round(Estimate, 3),
-      SE = round(SE, 3),
-      df = round(df, 2),
-      t = round(t, 2),
-      p = ifelse(p < .001, "< .001", sprintf("%.3f", p))
+  
+  p <- ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(x = group, y = Value, fill = group, color = group)
+  ) +
+    ggplot2::geom_violin(
+      width = 0.9,
+      alpha = 0.25,
+      trim = FALSE
+    ) +
+    ggplot2::geom_boxplot(
+      width = 0.18,
+      alpha = 0.70,
+      outlier.shape = NA,
+      color = "black"
+    ) +
+    ggplot2::geom_jitter(
+      width = 0.08,
+      alpha = 0.75,
+      size = 2
+    ) +
+    ggplot2::geom_segment(
+      data = annotation_df,
+      ggplot2::aes(x = x1, xend = x2, y = y_line, yend = y_line),
+      inherit.aes = FALSE,
+      linewidth = 0.5,
+      color = "black"
+    ) +
+    ggplot2::geom_text(
+      data = annotation_df,
+      ggplot2::aes(x = x_text, y = y, label = p_label),
+      inherit.aes = FALSE,
+      size = 5
+    ) +
+    ggplot2::facet_wrap(~ Metric, scales = "free_y") +
+    ggplot2::scale_fill_manual(
+      values = c("CT" = "orange", "SZ" = "steelblue")
+    ) +
+    ggplot2::scale_color_manual(
+      values = c("CT" = "orange", "SZ" = "steelblue")
+    ) +
+    ggplot2::labs(
+      x = NULL,
+      y = "Standardized score"
+    ) +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+      legend.position = "none",
+      strip.background = ggplot2::element_blank(),
+      strip.text = ggplot2::element_text(face = "bold", size = 11),
+      axis.title.y = ggplot2::element_text(size = 11),
+      axis.text = ggplot2::element_text(size = 10),
+      axis.line = ggplot2::element_line(color = "black"),
+      plot.margin = ggplot2::margin(10, 15, 10, 10)
     )
-
-  anovas <- dplyr::bind_rows(
-    as.data.frame(car::Anova(model_fi, type = 3)) |>
-      tibble::rownames_to_column("Predictor") |>
-      dplyr::mutate(Model = "First impression total"),
-    as.data.frame(car::Anova(model_ii, type = 3)) |>
-      tibble::rownames_to_column("Predictor") |>
-      dplyr::mutate(Model = "Interaction intention total"),
-    as.data.frame(car::Anova(model_global, type = 3)) |>
-      tibble::rownames_to_column("Predictor") |>
-      dplyr::mutate(Model = "Global total")
-  )
-
-  list(
-    data = analysis_data_for_models,
-    models = list(
-      first_impression = model_fi,
-      interaction_intention = model_ii,
-      global = model_global
-    ),
-    fixed_effects = fixed_effects,
-    anovas = anovas
-  )
+  
+  return(p)
 }

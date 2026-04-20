@@ -1,38 +1,120 @@
 ---
-title: "Movement Metrics - Group Statistics"
-output: rmarkdown::notebook
+title: "Movement statistics"
+output: html_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
 
 ## Objective
 
-This notebook tests whether the movement metrics differ between the `P` and `SZ` groups.
+For each participant, we compute three **global movement metrics**. Because
+two participants (P10 and SZ4) had only 4 of the 6 movements recorded, a
+raw mean across movements would be biased (the missing `hand_*` movements
+tend to have larger values than trunk/head movements). To avoid this, each
+metric is first **z-scored within each movement**, then the z-scores are
+averaged across the available movements per participant:
 
-```{r}
+- `mean_QoM` — standardized mean quantity of motion
+- `mean_amplitude_sum` — standardized mean cumulative amplitude
+- `mean_mean_speed` — standardized mean speed
+
+Values are thus expressed in standard-deviation units around the overall
+mean (0 = at average, positive = moves more than average, negative = less).
+
+We then report descriptive statistics by group, correlations between the
+three metrics, and CT vs SZ group comparisons. Tests are chosen from a
+simple Shapiro-Wilk normality check: parametric when data are approximately
+normal, non-parametric otherwise.
+
+```{r libraries}
 library(readr)
 library(dplyr)
-library(tidyr)
-library(knitr)
-library(tibble)
+library(rempsyc)
+library(flextable)
 ```
 
-```{r}
-dir.create("../results", showWarnings = FALSE)
+```{r setup-paths}
+dir.create("../results/tables", showWarnings = FALSE, recursive = TRUE)
 
-source("../sources/stat_helpers.R")
 source("../sources/movement_statistics.R")
-```
 
-```{r}
 movement_features <- read_csv(
   "../data/all_participants_movement_features.csv",
   show_col_types = FALSE
 )
+```
 
-movement_group_differences <- build_movement_group_differences(movement_features)
+## 1. Descriptive statistics
 
-print(movement_group_differences)
+```{r descriptives}
+movement_descriptives <- build_movement_descriptives(movement_features)
+
+write_csv(movement_descriptives,
+          "../results/tables/movement_descriptives_by_group.csv")
+
+rempsyc::nice_table(
+  movement_descriptives,
+  title = c("Table 1",
+            "Descriptive statistics of global movement metrics by group"),
+  note  = "Values are M (SD) in standard-deviation units (metrics were z-scored within each movement before being averaged). N_CT and N_SZ report the number of participants per group."
+)
+```
+
+## 2. Correlation matrix
+
+```{r correlations}
+cor_mat <- build_movement_correlation_matrix(movement_features)
+method  <- attr(cor_mat, "method")
+
+cor_df <- data.frame(Variable = rownames(cor_mat),
+                     round(cor_mat, 2),
+                     check.names = FALSE)
+
+write_csv(cor_df, "../results/tables/movement_metric_correlations.csv")
+
+rempsyc::nice_table(
+  cor_df,
+  title = c("Table 2",
+            sprintf("Correlations between global movement metrics (%s)",
+                    tools::toTitleCase(method))),
+  note  = sprintf(
+    "Method: %s (chosen because %s variable was %snormal in the Shapiro-Wilk test).",
+    tools::toTitleCase(method),
+    if (method == "pearson") "every" else "at least one",
+    if (method == "pearson") "" else "non-"
+  ),
+  col.format.r = 2:ncol(cor_df)
+)
+```
+
+## 3. Group comparisons (CT vs SZ)
+
+```{r group-diff}
+movement_group_diff <- build_movement_group_differences(movement_features)
+
+write_csv(movement_group_diff,
+          "../results/tables/movement_group_differences.csv")
+
+rempsyc::nice_table(
+  movement_group_diff,
+  title = c("Table 3",
+            "Group comparisons on global movement metrics"),
+  note  = c("CT and SZ columns are M (SD). Statistic is t for Welch t-tests and W for Wilcoxon rank-sum tests.",
+            "* p < .05, ** p < .01, *** p < .001")
+)
 ```
 
 ```{r}
-write_csv(movement_group_differences, "../results/movement_group_differences.csv")
+movement_plot <- plot_movement_group_differences(movement_features)
+movement_plot
+ggplot2::ggsave(
+  filename = "../results/figures/movement_group_differences.png",
+  plot = movement_plot,
+  width = 9,
+  height = 5.5,
+  dpi = 300
+)
 ```
+

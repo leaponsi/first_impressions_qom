@@ -1,6 +1,0 @@
-"0","```r
-result_1st_imp$source = \"result_1st_imp\"
-result_1st_imp_2$source = \"result_1st_imp_2\"
-combined_result = rbind(result_1st_imp, result_1st_imp_2)
-
-```"

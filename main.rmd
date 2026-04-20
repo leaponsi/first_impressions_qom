@@ -4,12 +4,51 @@ title: "Main R Analysis Runner"
 output: rmarkdown::notebook
 ---
 
-This notebook renders the R notebooks of the project in sequence.
+## Required R Packages
 
-```{r}
+This document requires R 4.0+ and the following packages:
+- **readr** — read CSV files
+- **dplyr** — data manipulation
+- **tidyr** — data reshaping
+- **ggplot2** — visualization
+- **lme4, lmerTest** — mixed-effects models
+- **emmeans** — estimated marginal means
+- **car** — model diagnostics
+- **rempsyc, flextable** — table formatting
+- **rmarkdown** — document rendering
+
+**First-time setup (run once in R/RStudio):**
+```r
+packages <- c("readr", "dplyr", "tidyr", "ggplot2", "lme4", "lmerTest", 
+              "emmeans", "car", "rempsyc", "flextable", "rmarkdown")
+install.packages(packages)
+```
+
+## Automatic Package Management and Document Rendering
+
+This chunk automatically loads required R packages and then renders the analysis notebooks.
+
+```{r setup, include=FALSE}
+# Automatic package management for pons.lea
+packages <- c(
+  "readr", "dplyr", "tidyr", "ggplot2",
+  "lme4", "lmerTest", "emmeans", "car",
+  "rempsyc", "flextable", "knitr"
+)
+
+# Install missing packages (commented by default for safety)
+# install.packages(setdiff(packages, rownames(installed.packages())))
+
+# Load all packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+cat("✓ All required R packages loaded\n")
+```
+
+```{r render_notebooks, include=TRUE}
+# Render all analysis notebooks in sequence
 notebooks_to_render <- c(
   "notebooks/q_preprocessing.Rmd",
-  "notebooks/stimuli_premanip.Rmd",
   "notebooks/movement_statistics.Rmd",
   "notebooks/q_statistics.Rmd",
   "notebooks/movement_first_impression.Rmd"

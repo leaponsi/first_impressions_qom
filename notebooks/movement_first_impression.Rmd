@@ -1,71 +1,247 @@
 ---
-title: "Movement Metrics and First Impressions"
-output: rmarkdown::notebook
+title: "Movement metrics and First impression"
+output: html_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
 
 ## Objective
 
-This notebook links movement metrics to first-impression ratings. It computes aggregated movement metrics, correlations with first-impression scores, and mixed models including the aggregated movement predictors.
+Do movement characteristics predict observers' first impression?
 
-```{r}
+We first look at the three global metrics separately, to check that their
+relationships with FirstImpression are consistent. We then combine them
+into a single composite score and test it with a mixed model.
+
+Spearman is used for all correlations because FirstImpression is a bounded
+sum of Likert items; it also captures monotonic relationships even if the
+link is not strictly linear.
+
+```{r libraries}
 library(readr)
 library(dplyr)
-library(stringr)
+library(ggplot2)
 library(tidyr)
 library(lme4)
 library(lmerTest)
-library(car)
-library(knitr)
-library(tibble)
+library(performance)
+library(rempsyc)
+library(flextable)
 ```
 
-```{r}
-dir.create("../results", showWarnings = FALSE)
+```{r setup-paths}
+dir.create("../results/tables",  showWarnings = FALSE, recursive = TRUE)
+dir.create("../results/figures", showWarnings = FALSE, recursive = TRUE)
 
-source("../sources/stat_helpers.R")
 source("../sources/questionnaire_analysis.R")
-source("../sources/stimuli_manip_check.R")
 source("../sources/movement_statistics.R")
-```
+source("../sources/movement_first_impression.R")
 
-```{r}
-data_imp <- read_csv("../data/data_imp.csv", show_col_types = FALSE)
+data_imp          <- read_csv("../data/data_imp.csv", show_col_types = FALSE)
 movement_features <- read_csv(
   "../data/all_participants_movement_features.csv",
   show_col_types = FALSE
 )
-stimuli_info <- read_stimuli_participants("../data/stimuli_participants.csv")
 ```
 
-```{r}
-metric_impression_correlations <- build_metric_impression_correlations(
-  questionnaire_df = data_imp,
-  features_df = movement_features,
-  stimuli_df = stimuli_info
+## 1. Each metric against First impression
+
+```{r corr-per-metric}
+cor_per_metric <- build_metric_impression_correlations_per_metric(
+  data_imp, movement_features
 )
 
-print(metric_impression_correlations)
+write_csv(cor_per_metric,
+          "../results/tables/metric_impression_correlations_per_metric.csv")
+
+rempsyc::nice_table(
+  cor_per_metric,
+  title = c("Table 1",
+            "Spearman correlations between each global movement metric and First impression"),
+  note  = c("Stimulus-level correlations (n = 40 videos). The three metrics show very similar associations with FirstImpression, which justifies combining them into a single composite score below.",
+            "* p < .05, ** p < .01, *** p < .001")
+)
 ```
 
-```{r}
-movement_model_outputs <- fit_total_movement_models(
-  questionnaire_df = data_imp,
-  features_df = movement_features,
-  stimuli_df = stimuli_info
+### Three scatter plots (one per metric)
+
+```{r scatter-per-metric, fig.width=11, fig.height=4}
+# Stimulus-level dataset with each raw metric
+q_scores     <- prepare_questionnaire_scores(data_imp)
+p_metrics    <- build_participant_metrics(movement_features)
+stim_metrics <- q_scores |>
+  dplyr::group_by(participant_id, Type) |>
+  dplyr::summarise(
+    FirstImpression_total = mean(FirstImpression_total, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::inner_join(p_metrics, by = "participant_id")
+
+metric_labels <- c(
+  mean_QoM           = "Mean QoM (z)",
+  mean_amplitude_sum = "Mean amplitude (z)",
+  mean_mean_speed    = "Mean speed (z)"
 )
 
-print(movement_model_outputs$fixed_effects)
-print(movement_model_outputs$anovas)
+stim_long <- stim_metrics |>
+  tidyr::pivot_longer(
+    cols      = names(metric_labels),
+    names_to  = "metric",
+    values_to = "value"
+  ) |>
+  dplyr::mutate(metric = factor(metric, levels = names(metric_labels),
+                                labels = metric_labels))
+
+fig_per_metric <- ggplot(stim_long,
+                         aes(x = value, y = FirstImpression_total)) +
+  geom_smooth(method = "lm",    se = FALSE, linetype = "dashed",
+              color = "black", linewidth = 0.7) +
+  geom_smooth(method = "loess", se = FALSE, color = "red",
+              linewidth = 0.9, alpha = 0.7) +
+  geom_point(aes(fill = Type), shape = 21, size = 2.8,
+             color = "black", stroke = 0.4, alpha = 0.9) +
+  scale_fill_manual(values = c("Healthy" = "#E69F00", "Patient" = "#0072B2")) +
+  facet_wrap(~ metric, scales = "free_x") +
+  labs(x = NULL,
+       y = "First impression total (stimulus average)",
+       fill = "Target type") +
+  theme_classic(base_size = 11) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(face = "bold"),
+        axis.title = element_text(face = "bold"))
+
+ggsave("../results/figures/scatter_each_metric_impression.png",
+       fig_per_metric, width = 11, height = 4, dpi = 150)
+
+fig_per_metric
 ```
 
-```{r}
-write_csv(metric_impression_correlations, "../results/metric_impression_correlations.csv")
-write_csv(
-  movement_model_outputs$fixed_effects,
-  "../results/mixed_models_with_total_movement_predictors.csv"
+The three scatterplots look nearly identical in shape and strength. This
+confirms that the three metrics capture the same underlying dimension and
+can safely be combined into one composite score.
+
+## 2. Composite score against First impression (regression)
+
+We combine the three z-scored metrics into `movement_global` by taking
+their mean, then fit a simple linear regression at the stimulus level
+(n = 40): **FirstImpression_total ~ movement_global**.
+
+```{r regression}
+reg_res <- build_metric_impression_regression(data_imp, movement_features)
+
+# Save the two views of the regression
+write_csv(reg_res, "../results/tables/metric_impression_regression.csv")
+
+# Extract the model-level stats for the plot annotation
+reg_r2      <- reg_res$R2[1]
+reg_f       <- reg_res$F_stat[1]
+reg_df_num  <- reg_res$df_num[1]
+reg_df_den  <- reg_res$df_den[1]
+reg_p       <- reg_res$p[reg_res$Predictor == "Movement composite (+1 SD)"]
+reg_slope   <- reg_res$B[reg_res$Predictor == "Movement composite (+1 SD)"]
+
+# Build the APA table (coefficients only; F/R² go in the note)
+reg_tab <- dplyr::select(reg_res, Predictor, B, SE, t, p)
+
+rempsyc::nice_table(
+  reg_tab,
+  title = c("Table 3",
+            "Linear regression: FirstImpression ~ Movement composite (n = 40 stimuli)"),
+  note  = c(sprintf("Model: R² = %.3f, F(%d, %d) = %.2f, p %s.",
+                    reg_r2, reg_df_num, reg_df_den, reg_f,
+                    ifelse(reg_p < .001, "< .001",
+                           sprintf("= %.3f", reg_p))),
+            "* p < .05, ** p < .01, *** p < .001")
 )
-write_csv(
-  movement_model_outputs$anovas,
-  "../results/mixed_models_with_total_movement_predictors_anova.csv"
+```
+
+### Scatter plot with regression line
+
+```{r scatter-composite, fig.width=6.5, fig.height=5}
+composite  <- build_participant_composite(movement_features)
+stim_comp  <- q_scores |>
+  dplyr::group_by(participant_id, Type) |>
+  dplyr::summarise(
+    FirstImpression_total = mean(FirstImpression_total, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::inner_join(composite, by = "participant_id")
+
+# Build the in-plot annotation string
+p_str <- ifelse(reg_p < .001, "< .001", sprintf("= %.3f", reg_p))
+annot <- sprintf(
+  "y = %.1f + %.1f x\nR² = %.3f\nF(%d, %d) = %.2f\np %s",
+  reg_res$B[reg_res$Predictor == "Intercept"],
+  reg_slope, reg_r2, reg_df_num, reg_df_den, reg_f, p_str
+)
+
+fig_composite <- ggplot(stim_comp,
+                        aes(x = movement_global, y = FirstImpression_total)) +
+  geom_smooth(method = "lm", se = TRUE, color = "black",
+              fill = "grey80", linewidth = 0.8) +
+  geom_point(aes(fill = Type), shape = 21, size = 3.5,
+             color = "black", stroke = 0.4, alpha = 0.9) +
+  scale_fill_manual(values = c("Healthy" = "#E69F00", "Patient" = "#0072B2")) +
+  annotate("label", x = -Inf, y = Inf, label = annot,
+           hjust = -0.05, vjust = 1.1, size = 3.6,
+           label.size = 0.3, fill = "white") +
+  labs(x = "Movement composite (z-score)",
+       y = "First impression total (stimulus average)",
+       fill = "Target type") +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom",
+        axis.title = element_text(face = "bold"))
+
+ggsave("../results/figures/scatter_movement_impression.png",
+       fig_composite, width = 6.5, height = 5, dpi = 150)
+
+fig_composite
+```
+
+The 95% confidence band of the regression (grey) is narrow and nearly
+straight, indicating that the linear model fits the data well.
+
+## 3. Mixed model: FirstImpression ~ Type + Movement composite
+
+Observers never knew whether the person they rated was Healthy or Patient.
+So the `Type` coefficient does **not** measure a conscious bias — it
+measures whatever differs in the point-light display between groups that
+observers pick up implicitly, **beyond** what the movement composite
+already captures.
+
+Reading the table:
+
+- **Patient vs Healthy** (B): mean difference in First-impression score,
+  in raw points, after controlling for movement and presentation order.
+  Healthy is the reference, so a negative B means "Patient lower than
+  Healthy". Here Healthy is coded as the reference.
+- **Movement composite (+1 SD)** (B): how many First-impression points are
+  gained for each additional standard deviation of movement.
+- **Presentation order** (B): effect of the video's rank in the sequence
+  (1 to 10).
+
+```{r model}
+model_out <- fit_metric_impression_model(data_imp, movement_features)
+
+write_csv(model_out$coefficients,
+          "../results/tables/metric_impression_model.csv")
+write_csv(model_out$fit,
+          "../results/tables/metric_impression_model_fit.csv")
+
+rempsyc::nice_table(
+  model_out$coefficients,
+  title = c("Table 4",
+            "Linear mixed model: FirstImpression ~ Type + Movement composite"),
+  note  = c("Random intercepts for observers (CASE) and videos (video_id). B for 'Patient vs Healthy' reads directly as the mean difference (Patient minus Healthy) controlling for movement and presentation order.",
+            "* p < .05, ** p < .01, *** p < .001")
+)
+
+rempsyc::nice_table(
+  model_out$fit,
+  title = c("Table 4 (fit)",
+            "Model fit indices"),
+  note  = "Marginal R² = variance explained by the fixed effects alone. Conditional R² = variance explained by fixed + random effects combined. Nakagawa & Schielzeth (2013)."
 )
 ```
