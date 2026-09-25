@@ -1,0 +1,199 @@
+---
+title: "2. Data preparation - merging questionnaire, movement and clinical data"
+---
+
+## Objective
+
+This notebook merges the three source tables into the analysis-ready
+data sets used throughout `03_statistical_analysis.Rmd`:
+
+1. the long-format first-impression ratings
+   (`data/imp/01_long.csv`, produced
+   by `01_questionnaire_long.Rmd`);
+2. the movement features
+   (`data/movement/05_qom.csv`, produced by the
+   movement pipeline, `code/movement/05_qom`);
+3. the stimulus participants' clinical/demographic data
+   (`data/stimuli_participants.csv`).
+
+It renames and cleans the three sources, checks their merge keys, joins
+them into 3 outputs:
+- `data_complete` (one row per observer x video) — used for the first-impression LMMs (H1, H3, H4).
+- `data_stimuli` (one row per video) — used for movement analyses (PCA, H2) and stimulus/clinical descriptives.
+- `data_observers` (one row per observer) — used for the observer-panel descriptive table.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = TRUE,
+  warning    = TRUE
+)
+```
+
+```{r libraries}
+suppressPackageStartupMessages({
+  library(dplyr); library(tidyr); library(readr); library(stringr)
+})
+
+PATH_DATA   <- "../../data"
+PATH_DATA_MOV   <- "../../data/movement"
+PATH_DATA_IMP  <- "../../data/imp"
+PATH_DATA_MERGED <- "../../data/merged"
+dir.create(PATH_DATA_MOV, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Data-preparation functions
+
+```{r prep-functions}
+# ---- Clean and rename columns of the three source files --------------------
+clean_impressions <- function(d) {
+  d |>
+    rename(obs_id        = CASE,
+           obs_age       = Age,
+           obs_gender    = Gender,
+           obs_pro_sante = Pro_Sante) |>
+    rename_with(
+      .cols = any_of(c("Sympathique", "Bizarre", "Bizarre_inversed",
+                       "Intelligente", "Appreciable", "Confiance",
+                       "Dominante", "Conversation", "Temps", "Voisin",
+                       "Assis", "Total_score")),
+      .fn = ~ paste0("imp_", tolower(.x))
+    ) |>
+    mutate(
+      stim_id    = str_replace(vid, "^Video_", "") |> str_replace("\\.mp4$", ""),
+      stim_group = case_when(Type == "Patient" ~ "SZ",
+                             Type == "Healthy" ~ "P",
+                             TRUE              ~ NA_character_) |>
+                   factor(levels = c("P", "SZ"))
+    )
+}
+
+# Keep the four directional QoM signals (hands/head x horizontal/vertical).
+clean_movement <- function(d) {
+  keep_signals <- c("hands_horizontal", "hands_vertical",
+                    "head_horizontal",  "head_vertical")
+  d |>
+    rename(stim_id = participant_id,
+           move_group_check = group) |>
+    filter(signal %in% keep_signals) |>
+    select(stim_id, move_group_check, signal, qom_rate) |>
+    pivot_wider(id_cols     = c(stim_id, move_group_check),
+                names_from  = signal,
+                values_from = qom_rate,
+                names_glue  = "qom_rate_{signal}") |>
+    rename_with(.cols = starts_with("qom_rate_"),
+                .fn   = ~ paste0("move_", str_remove(.x, "^qom_rate_"),
+                                 "_qom_rate"))
+}
+
+# Note: the raw stimuli_participants.csv no longer carries a name-derived
+# `ID` column (removed at the source for anonymisation), so it is not
+# renamed/kept here.
+clean_stimuli <- function(d) {
+  d |>
+    rename(stim_id                    = Participant,
+           stim_group_clinical_raw    = Group,
+           stim_gender                = Gender,
+           stim_age                   = Age,
+           stim_education             = Education,
+           stim_diagnostic_duration   = diagnostic_duration,
+           stim_fNART_errors          = fNART_errors,
+           stim_BDI_II                = BDI_II,
+           stim_MOCA                  = MOCA,
+           stim_PANSS_positive        = PANSS_Positive,
+           stim_PANSS_negative        = PANSS_Negative,
+           stim_PANSS_psychopathology = PANSS_Psychopathology,
+           stim_chlorpro_mg           = chlorpro_mg) |>
+    mutate(stim_group_clinical_check = case_when(
+             stim_group_clinical_raw == "CT" ~ "P",
+             stim_group_clinical_raw == "SZ" ~ "SZ",
+             TRUE                            ~ NA_character_) |>
+             factor(levels = c("P", "SZ")))
+}
+
+check_unique_key <- function(data, key) {
+  ok <- nrow(data) == length(unique(data[[key]]))
+  msg <- sprintf("Key '%s': %d rows / %d unique values - %s",
+                 key, nrow(data), length(unique(data[[key]])),
+                 if (ok) "OK" else "DUPLICATES")
+  if (ok) message(msg) else warning(msg)
+  invisible(ok)
+}
+
+# Adds a readable group_label (HC / IDS) alongside stim_group (P / SZ).
+recode_grp <- function(d) {
+  d |> mutate(group_label = factor(stim_group,
+                                   levels = c("P", "SZ"),
+                                   labels = c("HC", "IDS")))
+}
+```
+
+## Read, clean and merge
+
+```{r read-data}
+imp_raw  <- read_csv(file.path(PATH_DATA_IMP, "01_long.csv"),
+                     show_col_types = FALSE)
+mov_raw  <- read_csv(file.path(PATH_DATA_MOV, "05_qom.csv"),
+                     show_col_types = FALSE)
+stim_raw <- read_delim(file.path(PATH_DATA, "stimuli_participants.csv"),
+                       delim = ";", escape_double = FALSE, trim_ws = TRUE,
+                       show_col_types = FALSE)
+
+imp  <- clean_impressions(imp_raw)
+mov  <- clean_movement(mov_raw)
+stim <- clean_stimuli(stim_raw)
+
+# Sanity checks
+check_unique_key(mov,  "stim_id")
+check_unique_key(stim, "stim_id")
+
+# Group consistency between impression file (Type) and stimuli file (Group)
+group_check <- imp |>
+  distinct(stim_id, stim_group) |>
+  left_join(stim |> select(stim_id, stim_group_clinical_check), by = "stim_id") |>
+  filter(!is.na(stim_group_clinical_check),
+         as.character(stim_group) != as.character(stim_group_clinical_check))
+if (nrow(group_check) > 0) warning("Group mismatch detected; see object 'group_check'.")
+
+# Merge into the long evaluation-level table
+data_complete <- imp |>
+  left_join(mov  |> select(-any_of("move_group_check")), by = "stim_id") |>
+  left_join(stim |> select(-any_of(c("stim_group_clinical_raw",
+                                      "stim_group_clinical_check"))),
+            by = "stim_id")
+
+# Stimulus-level table (no repeated rows)
+data_stimuli <- data_complete |>
+  distinct(stim_id, .keep_all = TRUE) |>
+  select(stim_id, stim_group, stim_gender, stim_age, stim_education,
+         stim_BDI_II, stim_fNART_errors, stim_MOCA,
+         stim_PANSS_positive, stim_PANSS_negative, stim_PANSS_psychopathology,
+         stim_diagnostic_duration, stim_chlorpro_mg,
+         all_of(intersect(c("move_hands_horizontal_qom_rate",
+                             "move_hands_vertical_qom_rate",
+                             "move_head_horizontal_qom_rate",
+                             "move_head_vertical_qom_rate"),
+                          names(data_complete))))
+
+# Observer-level table
+data_observers <- data_complete |>
+  distinct(obs_id, .keep_all = TRUE) |>
+  select(obs_id, obs_age, obs_gender, obs_pro_sante)
+
+# Readable group label (HC / IDS), kept alongside stim_group (P / SZ)
+data_complete <- recode_grp(data_complete)
+data_stimuli  <- recode_grp(data_stimuli)
+```
+
+## Export
+
+```{r export}
+write_csv(data_complete,  file.path(PATH_DATA_MERGED, "data_complete.csv"))
+write_csv(data_stimuli,   file.path(PATH_DATA_MERGED, "data_stimuli.csv"))
+write_csv(data_observers, file.path(PATH_DATA_MERGED, "data_observers.csv"))
+
+message("Wrote data_complete.csv (", nrow(data_complete), " rows), ",
+        "data_stimuli.csv (", nrow(data_stimuli), " rows), ",
+        "data_observers.csv (", nrow(data_observers), " rows) to ",
+        PATH_DATA_MERGED)
+```

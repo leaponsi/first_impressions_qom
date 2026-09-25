@@ -1,0 +1,56 @@
+---
+title: "1. Questionnaire preprocessing - First Impressions"
+---
+
+## Objective
+
+This notebook:
+
+1. Loads the questionnaire preprocessing function (`organize_data()`,
+   defined in `questionnaire_preprocessing.R`);
+2. Imports the raw SoSciSurvey export;
+3. Filters out failed attention checks and reshapes the dataset from
+   wide (one row per observer) to long format (one row per observer x
+   video);
+4. Exports the resulting long-format dataset for the next step
+   (`02_prepare_data.Rmd`).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r libraries}
+library(dplyr)
+library(readxl)
+library(readr)
+```
+
+```{r source-and-read}
+source("questionnaire_preprocessing.R")
+raw_data_1st_imp <- read_excel("../../data/imp/raw_data_1st_imp.xlsx")
+```
+
+```{r organize}
+data_imp <- organize_data(raw_data_1st_imp)
+```
+
+```{r quick-checks}
+# Quick checks
+#head(data_imp)
+#dim(data_imp)
+#colSums(is.na(data_imp)) # Check for missing values, 0 means no missing data
+```
+
+```{r export}
+out_path <- "../../data/imp/01_long.csv"
+write_csv(data_imp, out_path)
+if (file.exists(out_path)) {
+  print(paste("Data successfully exported to", out_path))
+} else {
+  print("Error: Data export failed.")
+}
+```

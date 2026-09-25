@@ -1,0 +1,2653 @@
+---
+title: "First impressions and movement in schizophrenia"
+subtitle: "Statistical analysis pipeline"
+author: "Statistical analysis report"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    df_print: paged
+    code_folding: show
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  message    = TRUE,
+  warning    = TRUE,
+  fig.align  = "center",
+  fig.retina = 2,
+  dpi        = 300
+)
+```
+
+# Introduction
+
+This notebook reports the statistical analysis of first impressions
+formed about individuals with schizophrenia (SZ) and matched healthy
+controls (P), and the relationship between these impressions and the
+**quantity of body movement** (QoM) of the hands and of the head,
+extracted from short video stimuli.
+
+The movement analysis uses four directional quantity-of-motion (QoM)
+features, extracted at the stimulus level:
+
+-   `move_hands_horizontal_qom_rate` — hand movement, horizontal (per second);
+-   `move_hands_vertical_qom_rate` — hand movement, vertical (per second);
+-   `move_head_horizontal_qom_rate` — head movement, horizontal (per second);
+-   `move_head_vertical_qom_rate` — head movement, vertical (per second).
+
+These are first correlated, then reduced to a single overall movement
+component by PCA, which is used in the group and impression analyses.
+
+------------------------------------------------------------------------
+
+# Materials and methods
+
+## Software
+
+```{r software-info}
+# Printed in full at the end of the report (session info), as recommended by
+# SAMPL: "Name the statistical software package used in the analysis."
+R.version.string
+```
+
+Analyses were performed in **R** with the following packages: `lme4`,
+`lmerTest`, `emmeans`, `performance`, `effectsize`, `psych`, `car`,
+`flextable`, `gt`, `ggplot2`, `patchwork`. The full session information
+is reported at the end of this document.
+
+## Statistical analyses
+
+**Alpha level.** All inferential tests used a two-sided α = 0.05 unless
+otherwise specified.
+
+**Descriptive statistics.** Continuous variables are summarised as mean
+(SD) when approximately normally distributed and as median [Q1, Q3]
+otherwise. Sample sizes (N) are reported for every analysis. Standard
+deviations (not standard errors) are used to convey variability.
+
+**Group comparisons (P vs. SZ) at the stimulus level.** For each
+continuous variable, the test was selected automatically: (i)
+Shapiro–Wilk per group tested normality and Levene's test tested
+homogeneity of variances; (ii) when both assumptions held, an
+independent-samples Student *t*-test was used; (iii) when variances
+differed, Welch's *t*-test; (iv) when normality failed, the Wilcoxon
+rank-sum test. Effect sizes are Cohen's *d* for *t*-tests and the
+rank-biserial correlation for Wilcoxon tests, each with a 95 % CI.
+
+**Linear mixed models (LMM).** For analyses on the evaluation-level data
+(one row per observer × video), LMMs were fitted with `lmerTest` using
+restricted maximum likelihood (REML). Random intercepts were specified
+for observer and for video stimulus,
+`outcome ~ predictor(s) + (1 | obs_id) + (1 | vid)`. Denominator degrees
+of freedom and *p*-values were obtained via Satterthwaite's
+approximation. For every LMM we report (a) the fixed-effect estimates
+with 95 % CI, (b) the marginal *R²* (variance explained by the fixed
+effects) and conditional *R²* (fixed + random effects) following
+Nakagawa & Schielzeth, and (c) an explicit **partition of the random
+variance**: the variance component and the proportion of the residual
+(unexplained) variance attributable to each random intercept (observer,
+video) and to the residual, together with the intraclass correlation
+(ICC = proportion of residual variance captured by the random
+intercepts). The additional variance accounted for by the random
+structure beyond the fixed effects is summarised by conditional *R²* −
+marginal *R²*. For the two-group models (total score and each item) a
+standardised mean-difference effect size (Cohen's *d*, SZ − P) is
+additionally obtained from the estimated marginal means with
+`emmeans::eff_size()`. Model assumptions (normality of residuals,
+homoscedasticity, normality of the random-effect BLUPs, singularity and
+convergence) were checked numerically and visually with
+`performance::check_model()`.
+
+**Aggregating the movement features.** The four directional QoM features
+(hands and head × horizontal and vertical) were first inter-correlated at
+the stimulus level (Pearson's *r* when all features were approximately
+normal by Shapiro-Wilk, otherwise Spearman's *ρ*). Given their strong
+inter-correlations, they were reduced by a principal component analysis on
+the z-standardised features. Sampling adequacy was checked (Kaiser-Meyer-
+Olkin measure; Bartlett's test of sphericity); the number of components
+was determined by the Kaiser criterion (eigenvalue > 1) and parallel
+analysis, and a varimax (orthogonal) rotation was applied when more than
+one component was retained (no effect for a single component).
+Eigenvalues, communalities and a scree plot are reported. The dominant
+component — oriented so that higher scores indicate more movement and
+rescaled to unit SD — was used as a single *overall body movement* score
+in the subsequent analyses.
+
+**Group difference in movement.** The group difference in overall body
+movement was tested on this aggregate score at the stimulus level, with
+the test auto-selected from normality and variance-homogeneity checks and
+reported with its effect size.
+
+**Group and movement jointly.** The first-impression total-score model
+was then re-fitted with both diagnostic group and overall movement as
+fixed effects. This estimates the movement effect adjusting for group and
+quantifies the attenuation of the group difference once movement is
+accounted for (a mediation-style comparison, reported descriptively).
+Because group and movement are correlated at the stimulus level, their
+collinearity (VIF) is reported alongside.
+
+**Robustness.** Because several impression models showed mild
+heteroscedasticity, the principal fixed effects were re-estimated with a
+non-parametric **cluster bootstrap** (resampling whole video stimuli with
+replacement), and compared with the model-based estimates as a
+sensitivity analysis. The bootstrap is valid for the crossed observer ×
+video random structure, for which sandwich-type cluster-robust estimators
+are not defined.
+
+**Correlations.** Spearman's *ρ* was used throughout (no normality
+requirement, robust to the small SZ sample), with 95 % CIs from Fisher's
+*z* transformation. Correlations among clinical variables are flagged as
+exploratory (post-hoc) per SAMPL.
+
+**Multiple comparisons.** When several tests addressed one family of
+hypotheses, Benjamini–Hochberg (BH) false-discovery-rate correction was
+applied and the adjusted *p*-values are reported alongside the raw
+values (impression items: family of ten items; exploratory correlations:
+family of features within each clinical variable).
+
+**Missing data.** No imputation was performed; each test uses complete
+cases on the variables involved, and sample sizes are reported per
+analysis.
+
+------------------------------------------------------------------------
+
+# Constants, helper functions and data preparation
+
+## Packages and constants
+
+```{r packages-constants}
+suppressPackageStartupMessages({
+  library(dplyr); library(tidyr); library(readr); library(stringr)
+  library(purrr); library(tibble); library(ggplot2)
+  library(lme4);  library(lmerTest); library(emmeans); library(performance)
+  library(broom); library(broom.mixed); library(car); library(effectsize)
+  library(psych); library(flextable); library(gt); library(officer)
+  library(scales); library(patchwork)
+})
+
+# ---- Colours (PLOS-One-style figures) --------------------------------------
+GROUP_COLOURS <- c(
+  "P"  = "#f6a7a7",   # healthy controls — pink
+  "SZ" = "#9caffe"    # patients          — blue
+)
+
+# ---- Movement variables (only the two total-QoM features) ------------------
+MOVEMENT_VARS <- c(
+  "move_hands_horizontal_qom_rate",  # hand movement, horizontal (QoM rate)
+  "move_hands_vertical_qom_rate",    # hand movement, vertical (QoM rate)
+  "move_head_horizontal_qom_rate",   # head movement, horizontal (QoM rate)
+  "move_head_vertical_qom_rate"      # head movement, vertical (QoM rate)
+)
+
+# Pretty labels reused in tables and figures
+MOVEMENT_LABELS <- c(
+  move_hands_horizontal_qom_rate = "Hands, horizontal (QoM)",
+  move_hands_vertical_qom_rate   = "Hands, vertical (QoM)",
+  move_head_horizontal_qom_rate  = "Head, horizontal (QoM)",
+  move_head_vertical_qom_rate    = "Head, vertical (QoM)"
+)
+
+IMPRESSION_ITEMS <- c(
+  "imp_sympathique", "imp_bizarre_inversed", "imp_intelligente",
+  "imp_appreciable", "imp_confiance", "imp_dominante",
+  "imp_conversation", "imp_temps", "imp_voisin", "imp_assis"
+)
+
+ALPHA_LEVEL <- 0.05
+
+# ---- Output paths -----------------------------------------------------------
+PATH_DATA_RAW   <- "../data/raw"
+PATH_DATA_PROC  <- "../data/processed"
+PATH_TABLES     <- "../results/tables"
+PATH_FIGURES    <- "../results/figures"
+for (p in c(PATH_DATA_PROC, PATH_TABLES, PATH_FIGURES)) {
+  dir.create(p, recursive = TRUE, showWarnings = FALSE)
+}
+```
+
+## Formatting helpers
+
+```{r fmt-helpers}
+# ---- p-values (APA-style, 3 decimals, "<.001" when very small) -------------
+fmt_p <- function(p, digits = 3) {
+  vapply(p, function(x) {
+    if (is.na(x))     return("\u2014")
+    if (x < 0.001)    return("<.001")
+    sub("^0", "", sprintf(paste0("%.", digits, "f"), x))
+  }, character(1))
+}
+
+# ---- Generic numbers --------------------------------------------------------
+fmt_num <- function(x, digits = 2) {
+  ifelse(is.na(x), "\u2014", sprintf(paste0("%.", digits, "f"), x))
+}
+
+# ---- 95 % CI ----------------------------------------------------------------
+fmt_ci <- function(lo, hi, digits = 2) {
+  ifelse(is.na(lo) | is.na(hi), "\u2014",
+         sprintf("[%s, %s]", fmt_num(lo, digits), fmt_num(hi, digits)))
+}
+
+# ---- mean (SD) per SAMPL ----------------------------------------------------
+fmt_msd <- function(m, s, digits = 2) {
+  ifelse(is.na(m), "\u2014",
+         sprintf("%s (%s)", fmt_num(m, digits), fmt_num(s, digits)))
+}
+
+# ---- median [Q1, Q3] for non-normal data ------------------------------------
+fmt_med_iqr <- function(x, digits = 2) {
+  if (all(is.na(x))) return("\u2014")
+  q <- quantile(x, c(0.25, 0.5, 0.75), na.rm = TRUE)
+  sprintf("%s [%s, %s]",
+          fmt_num(q[2], digits), fmt_num(q[1], digits), fmt_num(q[3], digits))
+}
+
+# ---- Normalise emmeans CI column names (version-proof) ----------------------
+normalize_emm_ci <- function(df) {
+  nms <- names(df)
+  if ("asymp.LCL" %in% nms && !"lower.CL" %in% nms) df$lower.CL <- df$asymp.LCL
+  if ("asymp.UCL" %in% nms && !"upper.CL" %in% nms) df$upper.CL <- df$asymp.UCL
+  df
+}
+
+# ---- Significance stars (used only inside figures, not in tables) ----------
+p_stars <- function(p) {
+  dplyr::case_when(
+    is.na(p)   ~ "",
+    p < 0.001  ~ "***",
+    p < 0.01   ~ "**",
+    p < 0.05   ~ "*",
+    TRUE       ~ "ns"
+  )
+}
+
+# ---- Strip the move_ / imp_ / stim_ prefix for display ---------------------
+pretty_label <- function(x) {
+  out <- ifelse(x %in% names(MOVEMENT_LABELS),
+                unname(MOVEMENT_LABELS[x]),
+                NA_character_)
+  generic <- x %>%
+    stringr::str_remove("^(move_|imp_|stim_)") %>%
+    stringr::str_replace_all("_", " ") %>%
+    stringr::str_to_sentence()
+  ifelse(is.na(out), generic, out)
+}
+
+`%||%` <- function(x, y) if (is.null(x) || length(x) == 0) y else x
+```
+
+## Theme and figure-saving helpers
+
+```{r theme-helpers}
+# ---- PLOS-One-style minimal theme ------------------------------------------
+theme_plos <- function(base_size = 11, base_family = "") {
+  theme_minimal(base_size = base_size, base_family = base_family) %+replace%
+    theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor   = element_blank(),
+      panel.grid.major.y = element_line(colour = "grey90", linewidth = 0.3),
+      axis.line.x        = element_line(colour = "grey25", linewidth = 0.4),
+      axis.line.y        = element_line(colour = "grey25", linewidth = 0.4),
+      axis.ticks         = element_line(colour = "grey25", linewidth = 0.3),
+      axis.title         = element_text(size = base_size, colour = "grey15"),
+      axis.text          = element_text(colour = "grey20", size = base_size - 1),
+      plot.title         = element_text(size = base_size + 1, hjust = 0,
+                                        colour = "grey10", margin = margin(b = 6)),
+      plot.subtitle      = element_text(size = base_size - 1, hjust = 0,
+                                        colour = "grey35", margin = margin(b = 8)),
+      plot.caption       = element_text(size = base_size - 2, hjust = 0,
+                                        colour = "grey30", lineheight = 1.2,
+                                        margin = margin(t = 8)),
+      strip.background   = element_rect(fill = "white", colour = NA),
+      strip.text         = element_text(face = "bold", size = base_size,
+                                        colour = "grey15"),
+      legend.position    = "bottom",
+      legend.title       = element_text(size = base_size - 1),
+      legend.text        = element_text(size = base_size - 1),
+      plot.background    = element_rect(fill = "white", colour = NA),
+      panel.background   = element_rect(fill = "white", colour = NA),
+      plot.margin        = margin(10, 12, 10, 10)
+    )
+}
+
+# ---- Save TIFF + PNG (PLOS One: TIFF 300 dpi for submission) ---------------
+save_figure <- function(plot, basename, width = 5.2, height = 4.2, dpi = 300) {
+  dir.create(PATH_FIGURES, recursive = TRUE, showWarnings = FALSE)
+  tiff_path <- file.path(PATH_FIGURES, paste0(basename, ".tif"))
+  png_path  <- file.path(PATH_FIGURES, paste0(basename, ".png"))
+  ggsave(tiff_path, plot = plot, width = width, height = height,
+         dpi = dpi, compression = "lzw", bg = "white")
+  ggsave(png_path,  plot = plot, width = width, height = height,
+         dpi = dpi, bg = "white")
+  message("Saved: ", tiff_path, " and ", png_path)
+  invisible(c(tiff = tiff_path, png = png_path))
+}
+
+# ---- Add significance bracket above two bars -------------------------------
+add_signif_bracket <- function(p, x1, x2, y_top, p_value,
+                               tick_height_ratio = 0.02,
+                               star_size = 4.5) {
+  star <- p_stars(p_value)
+  y_drop <- y_top * (1 - tick_height_ratio)
+  y_star <- y_top * 1.012
+  p +
+    annotate("segment", x = x1,   xend = x2, y = y_top, yend = y_top,
+             colour = "grey20", linewidth = 0.4) +
+    annotate("segment", x = x1,   xend = x1, y = y_top, yend = y_drop,
+             colour = "grey20", linewidth = 0.4) +
+    annotate("segment", x = x2,   xend = x2, y = y_top, yend = y_drop,
+             colour = "grey20", linewidth = 0.4) +
+    annotate("text",    x = (x1 + x2) / 2, y = y_star, label = star,
+             size = star_size, vjust = 0, colour = "grey10")
+}
+```
+
+## Publication-style flextable helper
+
+```{r flextable-helper}
+# ---- PLOS-One-style flextable: bold title above, footnote(s) below ---------
+plos_table <- function(df, title, footnote = NULL,
+                       digits_cols = NULL) {
+  ft <- flextable::flextable(df) |>
+    flextable::theme_booktabs(bold_header = TRUE) |>
+    flextable::set_caption(caption = title,
+                           autonum  = officer::run_autonum(
+                             seq_id  = "tab", pre_label = "Table ",
+                             post_label = ". ", bkm = "table")) |>
+    flextable::font(fontname = "Calibri", part = "all") |>
+    flextable::fontsize(size = 10, part = "all") |>
+    flextable::fontsize(size = 10, part = "header") |>
+    flextable::bold(part = "header") |>
+    flextable::align(align = "left",   part = "header") |>
+    flextable::align(align = "center", part = "body") |>
+    flextable::align(j = 1, align = "left", part = "all") |>
+    flextable::padding(padding = 4, part = "all") |>
+    flextable::border_inner_h(border = officer::fp_border(color = "grey85", width = 0.5)) |>
+    flextable::hline_top(border    = officer::fp_border(color = "grey25", width = 1.2),
+                         part = "header") |>
+    flextable::hline_bottom(border = officer::fp_border(color = "grey25", width = 1.2),
+                            part = "header") |>
+    flextable::hline_bottom(border = officer::fp_border(color = "grey25", width = 1.2),
+                            part = "body")
+
+  if (!is.null(digits_cols)) {
+    for (col in names(digits_cols)) {
+      if (col %in% names(df))
+        ft <- flextable::colformat_double(ft, j = col,
+                                          digits = digits_cols[[col]])
+    }
+  }
+  if (!is.null(footnote)) {
+    ft <- flextable::add_footer_lines(ft, values = footnote)
+    ft <- flextable::italic(ft, italic = TRUE, part = "footer")
+    ft <- flextable::fontsize(ft, size = 9, part = "footer")
+  }
+  flextable::autofit(ft)
+}
+
+# ---- Export a flextable to .docx (PLOS expects cell-based Word tables) -----
+save_table <- function(ft, basename) {
+  dir.create(PATH_TABLES, recursive = TRUE, showWarnings = FALSE)
+  doc_path  <- file.path(PATH_TABLES, paste0(basename, ".docx"))
+  flextable::save_as_docx(ft, path = doc_path)
+  invisible(doc_path)
+}
+```
+
+## Data-preparation functions
+
+```{r prep-functions}
+# ---- Clean and rename columns of the three source files --------------------
+clean_impressions <- function(d) {
+  d |>
+    rename(obs_id        = CASE,
+           obs_age       = Age,
+           obs_gender    = Gender,
+           obs_pro_sante = Pro_Sante) |>
+    rename_with(
+      .cols = any_of(c("Sympathique", "Bizarre", "Bizarre_inversed",
+                       "Intelligente", "Appreciable", "Confiance",
+                       "Dominante", "Conversation", "Temps", "Voisin",
+                       "Assis", "Total_score")),
+      .fn = ~ paste0("imp_", tolower(.x))
+    ) |>
+    mutate(
+      stim_id    = str_replace(vid, "^Video_", "") |> str_replace("\\.mp4$", ""),
+      stim_group = case_when(Type == "Patient" ~ "SZ",
+                             Type == "Healthy" ~ "P",
+                             TRUE              ~ NA_character_) |>
+                   factor(levels = c("P", "SZ"))
+    )
+}
+
+# Keep the four directional QoM signals (hands/head x horizontal/vertical).
+clean_movement <- function(d) {
+  keep_signals <- c("hands_horizontal", "hands_vertical",
+                    "head_horizontal",  "head_vertical")
+  d |>
+    rename(stim_id = participant_id,
+           move_group_check = group) |>
+    filter(signal %in% keep_signals) |>
+    select(stim_id, move_group_check, signal, qom_rate) |>
+    pivot_wider(id_cols     = c(stim_id, move_group_check),
+                names_from  = signal,
+                values_from = qom_rate,
+                names_glue  = "qom_rate_{signal}") |>
+    rename_with(.cols = starts_with("qom_rate_"),
+                .fn   = ~ paste0("move_", str_remove(.x, "^qom_rate_"),
+                                 "_qom_rate"))
+}
+
+clean_stimuli <- function(d) {
+  d |>
+    rename(stim_id                    = Participant,
+           stim_code                  = ID,
+           stim_group_clinical_raw    = Group,
+           stim_gender                = Gender,
+           stim_age                   = Age,
+           stim_education             = Education,
+           stim_diagnostic_duration   = diagnostic_duration,
+           stim_fNART_errors          = fNART_errors,
+           stim_BDI_II                = BDI_II,
+           stim_MOCA                  = MOCA,
+           stim_PANSS_positive        = PANSS_Positive,
+           stim_PANSS_negative        = PANSS_Negative,
+           stim_PANSS_psychopathology = PANSS_Psychopathology,
+           stim_chlorpro_mg           = chlorpro_mg) |>
+    mutate(stim_group_clinical_check = case_when(
+             stim_group_clinical_raw == "CT" ~ "P",
+             stim_group_clinical_raw == "SZ" ~ "SZ",
+             TRUE                            ~ NA_character_) |>
+             factor(levels = c("P", "SZ")))
+}
+
+check_unique_key <- function(data, key) {
+  ok <- nrow(data) == length(unique(data[[key]]))
+  msg <- sprintf("Key '%s': %d rows / %d unique values - %s",
+                 key, nrow(data), length(unique(data[[key]])),
+                 if (ok) "OK" else "DUPLICATES")
+  if (ok) message(msg) else warning(msg)
+  invisible(ok)
+}
+```
+
+## Statistical-test functions
+
+```{r stat-functions}
+# ---- Auto-selected two-group test (SAMPL: report assumptions + effect size)
+auto_group_test <- function(data, outcome, group_var = "stim_group",
+                            alpha_normality = 0.05) {
+
+  d <- data |>
+    select(all_of(c(outcome, group_var))) |>
+    filter(!is.na(.data[[outcome]]), !is.na(.data[[group_var]]))
+
+  if (!is.numeric(d[[outcome]]))
+    stop(sprintf("'%s' is not numeric.", outcome))
+
+  d[[group_var]] <- droplevels(as.factor(d[[group_var]]))
+  if (nlevels(d[[group_var]]) != 2)
+    stop("Exactly two groups are required.")
+
+  groups <- levels(d[[group_var]])
+  desc <- d |>
+    group_by(.data[[group_var]]) |>
+    summarise(n      = dplyr::n(),
+              mean   = mean(.data[[outcome]]),
+              sd     = sd(.data[[outcome]]),
+              median = median(.data[[outcome]]),
+              q1     = quantile(.data[[outcome]], 0.25),
+              q3     = quantile(.data[[outcome]], 0.75),
+              .groups = "drop")
+
+  # Shapiro per group
+  norm <- d |>
+    group_by(.data[[group_var]]) |>
+    summarise(p_shapiro = if (dplyr::n() >= 3 && dplyr::n() <= 5000)
+                shapiro.test(.data[[outcome]])$p.value else NA_real_,
+              .groups = "drop")
+  normality_ok <- all(norm$p_shapiro > alpha_normality, na.rm = TRUE)
+
+  # Levene
+  fml <- as.formula(paste(outcome, "~", group_var))
+  lev <- tryCatch(car::leveneTest(fml, data = d, center = median),
+                  error = function(e) NULL)
+  p_levene   <- if (!is.null(lev)) lev$`Pr(>F)`[1] else NA_real_
+  vars_equal <- !is.na(p_levene) && p_levene > 0.05
+
+  # Test choice
+  if (normality_ok && vars_equal) {
+    test_name <- "Student t-test"
+    tt <- t.test(fml, data = d, var.equal = TRUE)
+    es <- effectsize::cohens_d(fml, data = d, pooled_sd = TRUE)
+    stat <- unname(tt$statistic); df_val <- unname(tt$parameter); pval <- tt$p.value
+    es_name <- "Cohen's d"; es_val <- es$Cohens_d
+    es_lo <- es$CI_low; es_hi <- es$CI_high
+    diff_est <- unname(tt$estimate[1] - tt$estimate[2])
+    diff_lo  <- tt$conf.int[1]; diff_hi <- tt$conf.int[2]
+  } else if (normality_ok && !vars_equal) {
+    test_name <- "Welch t-test"
+    tt <- t.test(fml, data = d, var.equal = FALSE)
+    es <- effectsize::cohens_d(fml, data = d, pooled_sd = FALSE)
+    stat <- unname(tt$statistic); df_val <- unname(tt$parameter); pval <- tt$p.value
+    es_name <- "Cohen's d"; es_val <- es$Cohens_d
+    es_lo <- es$CI_low; es_hi <- es$CI_high
+    diff_est <- unname(tt$estimate[1] - tt$estimate[2])
+    diff_lo  <- tt$conf.int[1]; diff_hi <- tt$conf.int[2]
+  } else {
+    test_name <- "Wilcoxon rank-sum"
+    wt <- suppressWarnings(wilcox.test(fml, data = d, exact = FALSE,
+                                       conf.int = TRUE))
+    es <- effectsize::rank_biserial(fml, data = d)
+    stat <- unname(wt$statistic); df_val <- NA_real_; pval <- wt$p.value
+    es_name <- "Rank-biserial r"; es_val <- es$r_rank_biserial
+    es_lo <- es$CI_low; es_hi <- es$CI_high
+    diff_est <- unname(wt$estimate)
+    diff_lo  <- wt$conf.int[1]; diff_hi <- wt$conf.int[2]
+  }
+
+  tibble(
+    outcome      = outcome,
+    g1           = groups[1],
+    n_g1         = desc$n[1],  mean_g1 = desc$mean[1], sd_g1 = desc$sd[1],
+    median_g1    = desc$median[1], q1_g1 = desc$q1[1], q3_g1 = desc$q3[1],
+    g2           = groups[2],
+    n_g2         = desc$n[2],  mean_g2 = desc$mean[2], sd_g2 = desc$sd[2],
+    median_g2    = desc$median[2], q1_g2 = desc$q1[2], q3_g2 = desc$q3[2],
+    shapiro_p_g1 = norm$p_shapiro[1],
+    shapiro_p_g2 = norm$p_shapiro[2],
+    normality_ok = normality_ok,
+    levene_p     = p_levene,
+    vars_equal   = vars_equal,
+    test         = test_name,
+    statistic    = stat,
+    df           = df_val,
+    p_value      = pval,
+    diff_est     = diff_est,
+    diff_ci_lo   = diff_lo,
+    diff_ci_hi   = diff_hi,
+    es_name      = es_name,
+    es           = es_val,
+    es_ci_lo     = es_lo,
+    es_ci_hi     = es_hi
+  )
+}
+
+auto_group_test_multi <- function(data, outcomes, group_var = "stim_group",
+                                  bh_correction = TRUE) {
+  res <- map_dfr(outcomes,
+                 ~ auto_group_test(data, .x, group_var))
+  if (bh_correction)
+    res$p_value_BH <- p.adjust(res$p_value, method = "BH")
+  res
+}
+
+# ---- Linear mixed models ---------------------------------------------------
+fit_lmm <- function(data, outcome, fixed_term, random = "(1 | obs_id) + (1 | vid)") {
+  fml <- as.formula(sprintf("%s ~ %s + %s", outcome, fixed_term, random))
+  lmerTest::lmer(fml, data = data, REML = TRUE)
+}
+
+extract_lmm_results <- function(model, target_term) {
+  fe <- summary(model)$coefficients |>
+    as.data.frame() |>
+    tibble::rownames_to_column("term") |>
+    as_tibble() |>
+    rename(estimate = Estimate, se = `Std. Error`,
+           df = df, statistic = `t value`, p_value = `Pr(>|t|)`)
+  ci <- tryCatch(confint(model, method = "Wald", parm = "beta_"),
+                 error = function(e) NULL)
+  if (!is.null(ci)) {
+    ci_df <- as.data.frame(ci) |> tibble::rownames_to_column("term") |>
+      as_tibble() |> rename(ci_lo = `2.5 %`, ci_hi = `97.5 %`)
+    fe <- left_join(fe, ci_df, by = "term")
+  }
+  row <- fe |> filter(str_detect(term, target_term)) |> slice(1)
+  r2  <- tryCatch(performance::r2(model), error = function(e) NULL)
+  r2m <- if (!is.null(r2)) as.numeric(r2$R2_marginal)    else NA_real_
+  r2c <- if (!is.null(r2)) as.numeric(r2$R2_conditional) else NA_real_
+  f2  <- if (!is.na(r2m) && r2m < 1) r2m / (1 - r2m)      else NA_real_
+  tibble(
+    term     = row$term  %||% NA_character_,
+    estimate = row$estimate %||% NA_real_,
+    se       = row$se       %||% NA_real_,
+    df       = row$df       %||% NA_real_,
+    statistic = row$statistic %||% NA_real_,
+    ci_lo    = row$ci_lo    %||% NA_real_,
+    ci_hi    = row$ci_hi    %||% NA_real_,
+    p_value  = row$p_value  %||% NA_real_,
+    r2_marg  = r2m,
+    r2_cond  = r2c,
+    f2       = f2
+  )
+}
+
+# ---- All fixed effects of an LMM (used for the multi-predictor model) ------
+lmm_fixed_table <- function(model, drop_intercept = TRUE) {
+  co <- summary(model)$coefficients |>
+    as.data.frame() |>
+    tibble::rownames_to_column("term") |>
+    as_tibble() |>
+    rename(estimate = Estimate, se = `Std. Error`,
+           df = df, statistic = `t value`, p_value = `Pr(>|t|)`)
+  ci <- tryCatch(confint(model, method = "Wald", parm = "beta_"),
+                 error = function(e) NULL)
+  if (!is.null(ci)) {
+    ci_df <- as.data.frame(ci) |> tibble::rownames_to_column("term") |>
+      as_tibble() |> rename(ci_lo = `2.5 %`, ci_hi = `97.5 %`)
+    co <- left_join(co, ci_df, by = "term")
+  } else {
+    co$ci_lo <- NA_real_; co$ci_hi <- NA_real_
+  }
+  if (drop_intercept) co <- co |> filter(term != "(Intercept)")
+  co
+}
+
+# ---- Standardised mean-difference (Cohen's d) for a two-group LMM ----------
+lmm_cohens_d <- function(model, spec = "stim_group", ref = "P") {
+  out <- tibble(d = NA_real_, d_lo = NA_real_, d_hi = NA_real_)
+  es_df <- tryCatch({
+    emm <- emmeans::emmeans(model, specs = spec)
+    # Total SD = sqrt of all variance components (observer + video + residual),
+    # so d is comparable to a conventional Cohen's d rather than inflated by the
+    # residual SD alone.
+    vc  <- as.data.frame(lme4::VarCorr(model))
+    sig <- sqrt(sum(vc$vcov[is.na(vc$var2)]))
+    edf <- tryCatch(stats::df.residual(model), error = function(e) Inf)
+    as.data.frame(emmeans::eff_size(emm, sigma = sig, edf = edf))
+  }, error = function(e) NULL)
+  if (is.null(es_df) || nrow(es_df) == 0) return(out)
+
+  lo_col <- intersect(c("lower.CL", "asymp.LCL"), names(es_df))[1]
+  hi_col <- intersect(c("upper.CL", "asymp.UCL"), names(es_df))[1]
+  con <- as.character(es_df$contrast[1])
+  d   <- es_df$effect.size[1]
+  lo  <- es_df[[lo_col]][1]
+  hi  <- es_df[[hi_col]][1]
+
+  if (grepl(paste0("^\\s*", ref, "\\b"), con)) {
+    d_new  <- -d; lo_new <- -hi; hi_new <- -lo
+    d <- d_new; lo <- lo_new; hi <- hi_new
+  }
+  tibble(d = d, d_lo = lo, d_hi = hi)
+}
+
+run_lmm_set <- function(data, outcomes, fixed_term, target_term,
+                        bh_correction = TRUE, save_diagnostics = TRUE,
+                        diag_prefix = "diag") {
+  res <- map_dfr(outcomes, function(out) {
+    m  <- fit_lmm(data, out, fixed_term)
+    if (save_diagnostics) {
+      dp <- file.path(PATH_FIGURES,
+                      sprintf("%s_%s.png", diag_prefix, out))
+      tryCatch({
+        g <- performance::check_model(m)
+        ggsave(dp, g, width = 10, height = 8, dpi = 200, bg = "white")
+      }, error = function(e) NULL)
+    }
+    bind_cols(tibble(outcome = out),
+              extract_lmm_results(m, target_term))
+  })
+  if (bh_correction)
+    res$p_value_BH <- p.adjust(res$p_value, method = "BH")
+  res
+}
+
+# ---- Spearman with Fisher-z 95 % CI ----------------------------------------
+spearman_with_ci <- function(x, y) {
+  d <- tibble(x = x, y = y) |> tidyr::drop_na()
+  n <- nrow(d)
+  if (n < 4) return(tibble(n = n, rho = NA_real_, ci_lo = NA_real_,
+                           ci_hi = NA_real_, p_value = NA_real_))
+  ct <- suppressWarnings(cor.test(d$x, d$y, method = "spearman",
+                                  exact = FALSE))
+  r <- unname(ct$estimate)
+  z <- atanh(r); se <- 1 / sqrt(n - 3)
+  lo <- tanh(z - 1.96 * se); hi <- tanh(z + 1.96 * se)
+  tibble(n = n, rho = r, ci_lo = lo, ci_hi = hi, p_value = ct$p.value)
+}
+
+spearman_multi <- function(data, y, xs, bh_correction = TRUE) {
+  res <- map_dfr(xs, function(x_var) {
+    out <- spearman_with_ci(data[[x_var]], data[[y]])
+    bind_cols(tibble(y = y, x = x_var), out)
+  })
+  if (bh_correction)
+    res$p_value_BH <- p.adjust(res$p_value, method = "BH")
+  res
+}
+```
+
+## LMM diagnostics and random-effect helpers
+
+```{r lmm-diagnostic-helpers}
+# ---- Numerical assumption checks for an lmer model -------------------------
+# Returns residual normality (Shapiro), homoscedasticity (auxiliary
+# Breusch-Pagan-type regression of squared residuals on fitted values),
+# random-effect BLUP normality, singularity and convergence flags.
+check_lmm_assumptions <- function(model) {
+  res <- stats::residuals(model)
+  fit <- stats::fitted(model)
+
+  shap_res <- tryCatch(
+    if (length(res) >= 3 && length(res) <= 5000)
+      shapiro.test(res)$p.value else NA_real_,
+    error = function(e) NA_real_)
+
+  # Breusch-Pagan-type homoscedasticity test
+  bp_p <- tryCatch({
+    aux <- stats::lm(I(res^2) ~ fit)
+    fst <- summary(aux)$fstatistic
+    if (!is.null(fst))
+      stats::pf(fst[1], fst[2], fst[3], lower.tail = FALSE) else NA_real_
+  }, error = function(e) NA_real_)
+  bp_p <- unname(bp_p)
+
+  re <- tryCatch(lme4::ranef(model), error = function(e) NULL)
+  shap_re <- list()
+  if (!is.null(re)) {
+    for (g in names(re)) {
+      b <- re[[g]][[1]]
+      shap_re[[g]] <- tryCatch(
+        if (length(b) >= 3 && length(b) <= 5000)
+          shapiro.test(b)$p.value else NA_real_,
+        error = function(e) NA_real_)
+    }
+  }
+
+  singular <- tryCatch(lme4::isSingular(model), error = function(e) NA)
+  conv_msgs <- tryCatch(model@optinfo$conv$lme4$messages,
+                        error = function(e) NULL)
+  non_conv  <- !is.null(conv_msgs) && length(conv_msgs) > 0
+
+  list(
+    resid_normal_p    = shap_res,
+    homosced_p        = bp_p,
+    homosced_violated = !is.na(bp_p) && bp_p < 0.05,
+    re_normal_p       = shap_re,
+    singular          = isTRUE(singular),
+    non_convergence   = non_conv
+  )
+}
+
+# ---- One formatted diagnostics row -----------------------------------------
+fmt_diag_row <- function(diag, label_value, label_name = "Model") {
+  re_obs <- diag$re_normal_p[["obs_id"]] %||% NA_real_
+  re_vid <- diag$re_normal_p[["vid"]]    %||% NA_real_
+  flag <- function(p) ifelse(is.na(p), "?", ifelse(p > 0.05, "ok", "!"))
+  summary_code <- paste(c(
+    paste0("R:", flag(diag$resid_normal_p)),
+    paste0("H:", flag(diag$homosced_p)),
+    paste0("RE-obs:", flag(re_obs)),
+    paste0("RE-vid:", flag(re_vid)),
+    if (isTRUE(diag$singular))        "singular"  else NULL,
+    if (isTRUE(diag$non_convergence)) "non-conv." else NULL
+  ), collapse = "; ")
+  tibble::tibble(
+    !!label_name := label_value,
+    `Residual normality (Shapiro p)` = fmt_p(diag$resid_normal_p),
+    `Homoscedasticity (BP p)`        = fmt_p(diag$homosced_p),
+    `RE obs normality (p)`           = fmt_p(re_obs),
+    `RE vid normality (p)`           = fmt_p(re_vid),
+    `Summary`                        = summary_code
+  )
+}
+
+# ---- Random-effect variance partition --------------------------------------
+# Variance and SD of each random intercept and of the residual, plus the
+# proportion of the total (residual + random) variance they each capture.
+re_variance_table <- function(model) {
+  vc <- as.data.frame(lme4::VarCorr(model))
+  vc <- vc[is.na(vc$var2), , drop = FALSE]      # keep variances, drop covariances
+  total <- sum(vc$vcov)
+  tibble::tibble(
+    grp      = vc$grp,
+    Component = ifelse(vc$grp == "Residual", "Residual (within-evaluation)",
+                       paste0(vc$grp, " (random intercept)")),
+    Variance = vc$vcov,
+    SD       = vc$sdcor,
+    prop     = vc$vcov / total
+  )
+}
+
+# Formatted RE-variance flextable for a single model, with ICC + R2 context.
+fmt_re_table <- function(model, title, footnote = NULL) {
+  rv <- re_variance_table(model)
+  icc <- sum(rv$prop[rv$grp != "Residual"])
+  r2  <- tryCatch(performance::r2(model), error = function(e) NULL)
+  r2m <- if (!is.null(r2)) as.numeric(r2$R2_marginal)    else NA_real_
+  r2c <- if (!is.null(r2)) as.numeric(r2$R2_conditional) else NA_real_
+
+  disp <- rv |>
+    transmute(
+      `Random component`               = Component,
+      Variance                         = fmt_num(Variance, 3),
+      SD                               = fmt_num(SD, 3),
+      `% of residual+random variance`  = sprintf("%.1f%%", prop * 100)
+    )
+
+  fn <- c(
+    sprintf(paste0("ICC = %.3f: proportion of the residual (unexplained) ",
+                   "variance captured jointly by the observer and video ",
+                   "random intercepts."), icc),
+    sprintf(paste0("Marginal R2 = %s (fixed effects); conditional R2 = %s ",
+                   "(fixed + random). The random structure adds %s of ",
+                   "explained variance beyond the fixed effects."),
+            fmt_num(r2m, 3), fmt_num(r2c, 3), fmt_num(r2c - r2m, 3))
+  )
+  if (!is.null(footnote)) fn <- c(footnote, fn)
+  plos_table(disp, title = title, footnote = fn)
+}
+
+# Compact one-row RE summary for sets of models (e.g. the 10 items).
+re_proportions_row <- function(model, label, label_name = "Model") {
+  rv <- re_variance_table(model)
+  getp <- function(g) {
+    v <- rv$prop[rv$grp == g]; if (length(v)) v[1] else NA_real_
+  }
+  obs_p <- getp("obs_id"); vid_p <- getp("vid"); res_p <- getp("Residual")
+  tibble::tibble(
+    !!label_name := label,
+    `Observer var (%)` = sprintf("%.1f%%", obs_p * 100),
+    `Video var (%)`    = sprintf("%.1f%%", vid_p * 100),
+    `Residual var (%)` = sprintf("%.1f%%", res_p * 100),
+    `ICC`              = fmt_num(obs_p + vid_p, 3)
+  )
+}
+
+# ---- Sample-size / model-fit line for article-ready reporting ---------------
+# Returns "N = n evaluations from k observers and m videos. AIC = ...; BIC = ..."
+model_info_line <- function(model) {
+  mf <- stats::model.frame(model)
+  ng <- tryCatch(lme4::ngrps(model), error = function(e) c(obs_id = NA, vid = NA))
+  n_obs_id <- if ("obs_id" %in% names(ng)) unname(ng["obs_id"]) else NA
+  n_vid    <- if ("vid"    %in% names(ng)) unname(ng["vid"])    else NA
+  sprintf(paste0("N = %d evaluations from %s observers and %s videos. ",
+                 "AIC = %s; BIC = %s; REML deviance = %s."),
+          nrow(mf), n_obs_id, n_vid,
+          fmt_num(stats::AIC(model), 1), fmt_num(stats::BIC(model), 1),
+          fmt_num(as.numeric(-2 * as.numeric(stats::logLik(model))), 1))
+}
+
+# ---- Cluster bootstrap for heteroscedasticity-robust LMM inference ----------
+# Resamples whole clusters (stimuli / vid) with replacement and refits the
+# model, giving robust SEs, percentile CIs and p-values. Works with CROSSED
+# random effects (unlike CR2 sandwich estimators, which require nesting).
+# Resampled clusters are relabelled so repeated draws form distinct RE levels.
+cluster_bootstrap_lmm <- function(model, cluster = "vid", B = 1000, seed = 1) {
+  set.seed(seed)
+  data <- stats::model.frame(model)
+  form <- stats::formula(model)
+  if (!cluster %in% names(data)) return(NULL)
+
+  idx_by   <- split(seq_len(nrow(data)), data[[cluster]])
+  clusters <- names(idx_by)
+  nclus    <- length(clusters)
+  fe0      <- lme4::fixef(model)
+  terms    <- names(fe0)
+  boot     <- matrix(NA_real_, B, length(terms), dimnames = list(NULL, terms))
+  ctrl     <- lme4::lmerControl(check.conv.singular = "ignore",
+                                calc.derivs = FALSE)
+
+  for (b in seq_len(B)) {
+    samp <- sample(clusters, nclus, replace = TRUE)
+    lens <- lengths(idx_by[samp])
+    newd <- data[unlist(idx_by[samp], use.names = FALSE), , drop = FALSE]
+    newd[[cluster]] <- factor(rep(seq_len(nclus), times = lens))  # distinct draws
+    fit <- tryCatch(suppressWarnings(suppressMessages(
+      lme4::lmer(form, data = newd, REML = TRUE, control = ctrl))),
+      error = function(e) NULL)
+    if (!is.null(fit)) {
+      fb <- lme4::fixef(fit)
+      boot[b, names(fb)] <- fb
+    }
+  }
+
+  qs <- apply(boot, 2, stats::quantile, probs = c(.025, .975), na.rm = TRUE)
+  tibble::tibble(
+    term     = terms,
+    estimate = unname(fe0[terms]),
+    boot_se  = apply(boot, 2, stats::sd, na.rm = TRUE),
+    ci_lo    = qs[1, ],
+    ci_hi    = qs[2, ],
+    p_value  = vapply(terms, function(tn) {
+      v <- boot[, tn]; v <- v[!is.na(v)]
+      if (!length(v)) NA_real_ else min(1, 2 * min(mean(v <= 0), mean(v >= 0)))
+    }, numeric(1)),
+    n_boot   = colSums(!is.na(boot))
+  )
+}
+```
+
+## Read and merge data
+
+```{r read-data, eval=TRUE}
+imp_raw  <- read_csv(file.path(PATH_DATA_RAW, "data_imp.csv"),
+                     show_col_types = FALSE)
+mov_raw  <- read_csv(file.path(PATH_DATA_RAW, "all_participants_features.csv"),
+                     show_col_types = FALSE)
+stim_raw <- read_delim(file.path(PATH_DATA_RAW, "stimuli_participants.csv"),
+                       delim = ";", escape_double = FALSE, trim_ws = TRUE,
+                       show_col_types = FALSE)
+
+imp  <- clean_impressions(imp_raw)
+mov  <- clean_movement(mov_raw)
+stim <- clean_stimuli(stim_raw)
+
+# Sanity checks
+check_unique_key(mov,  "stim_id")
+check_unique_key(stim, "stim_id")
+
+# Group consistency between impression file (Type) and stimuli file (Group)
+group_check <- imp |>
+  distinct(stim_id, stim_group) |>
+  left_join(stim |> select(stim_id, stim_group_clinical_check), by = "stim_id") |>
+  filter(!is.na(stim_group_clinical_check),
+         as.character(stim_group) != as.character(stim_group_clinical_check))
+if (nrow(group_check) > 0) warning("Group mismatch detected; see object 'group_check'.")
+
+# Merge into the long evaluation-level table
+data_complete <- imp |>
+  left_join(mov  |> select(-any_of("move_group_check")), by = "stim_id") |>
+  left_join(stim |> select(-any_of(c("stim_group_clinical_raw",
+                                      "stim_group_clinical_check"))),
+            by = "stim_id")
+
+# Stimulus-level table (no repeated rows)
+data_stimuli <- data_complete |>
+  distinct(stim_id, .keep_all = TRUE) |>
+  select(stim_id, stim_group, stim_gender, stim_age, stim_education,
+         stim_BDI_II, stim_fNART_errors, stim_MOCA,
+         stim_PANSS_positive, stim_PANSS_negative, stim_PANSS_psychopathology,
+         stim_diagnostic_duration, stim_chlorpro_mg,
+         all_of(intersect(MOVEMENT_VARS, names(data_complete))))
+
+# Observer-level table
+data_observers <- data_complete |>
+  distinct(obs_id, .keep_all = TRUE) |>
+  select(obs_id, obs_age, obs_gender, obs_pro_sante)
+
+# Export processed CSVs
+write_csv(data_complete,  file.path(PATH_DATA_PROC, "data_complete.csv"))
+write_csv(data_stimuli,   file.path(PATH_DATA_PROC, "data_stimuli.csv"))
+write_csv(data_observers, file.path(PATH_DATA_PROC, "data_observers.csv"))
+```
+```{r}
+library(dplyr)
+recode_grp <- function(d) {
+  d |> mutate(group_label = factor(stim_group,
+                                   levels = c("P", "SZ"),
+                                   labels = c("HC", "IDS")))
+}
+data_complete <- recode_grp(data_complete)
+data_stimuli  <- recode_grp(data_stimuli)
+```
+
+------------------------------------------------------------------------
+
+# Results
+
+## Reliability of the first-impression scale
+
+**Purpose.** Estimate the internal consistency of the 10
+first-impression items used to compute the total impression score.
+
+**Items used.** `imp_bizarre_inversed` is the recoded (reverse) version
+of `imp_bizarre`; only the inverted version is included in the score and
+in the reliability analysis.
+
+```{r cronbach}
+alpha_obj <- psych::alpha(data_complete[, IMPRESSION_ITEMS, drop = FALSE],
+                          check.keys = FALSE, warnings = FALSE)
+
+alpha_summary <- tibble(
+  `N items`                       = length(IMPRESSION_ITEMS),
+  `N observations`                = sum(complete.cases(
+                                       data_complete[, IMPRESSION_ITEMS])),
+  `Cronbach's α (raw)`            = alpha_obj$total$raw_alpha,
+  `Cronbach's α (standardised)`   = alpha_obj$total$std.alpha,
+  `Guttman's λ6`                  = alpha_obj$total$`G6(smc)`,
+  `Mean inter-item correlation`   = alpha_obj$total$average_r
+)
+
+ft_alpha <- alpha_summary |>
+  mutate(across(where(is.numeric), ~ fmt_num(.x, 3))) |>
+  plos_table(
+    title = "Internal consistency of the 10-item first-impression scale.",
+    footnote = paste0(
+      "Reliability estimated with the psych::alpha() function. ",
+      "Items: ", paste(IMPRESSION_ITEMS, collapse = ", "), ". ",
+      "imp_bizarre_inversed is the reverse-scored version of imp_bizarre."
+    )
+  )
+ft_alpha
+save_table(ft_alpha, "table_01_cronbach_alpha")
+
+# Alpha if item dropped (diagnostic - reported as S1)
+alpha_if_dropped <- alpha_obj$alpha.drop |>
+  as.data.frame() |>
+  tibble::rownames_to_column("Item") |>
+  as_tibble() |>
+  transmute(Item,
+            `α (raw) if dropped`          = fmt_num(raw_alpha, 3),
+            `α (standardised) if dropped` = fmt_num(std.alpha, 3),
+            `Mean r if dropped`           = fmt_num(average_r, 3))
+
+ft_alpha_drop <- plos_table(
+  alpha_if_dropped,
+  title = "Cronbach's α and mean inter-item correlation if each item is dropped.",
+  footnote = "Items are not removed in subsequent analyses; this is a diagnostic."
+)
+ft_alpha_drop
+save_table(ft_alpha_drop, "table_S1_cronbach_if_dropped")
+```
+
+## Characteristics of stimulus participants
+
+**Purpose.** Describe and compare the two stimulus groups (P vs. SZ) on
+demographic and general cognitive variables.
+
+**Method.** Each continuous variable was tested with
+`auto_group_test()`, which selects between Student's *t*-test, Welch's
+*t*-test, and the Wilcoxon rank-sum test on the basis of Shapiro–Wilk
+and Levene tests. Gender is reported as count and column percentage;
+group differences in gender are tested with Pearson's χ² (or Fisher's
+exact when expected counts are \< 5).
+
+```{r stimuli-characteristics}
+vars_stim_continu <- c("stim_age", "stim_education",
+                       "stim_BDI_II", "stim_fNART_errors", "stim_MOCA")
+
+# --- Continuous variables: auto-test ----------------------------------------
+stim_tests <- auto_group_test_multi(data_stimuli, vars_stim_continu,
+                                    group_var = "stim_group",
+                                    bh_correction = FALSE)
+
+# --- Gender (chi-square / Fisher) -------------------------------------------
+gender_tab <- table(data_stimuli$stim_gender, data_stimuli$stim_group)
+gender_test <- if (any(chisq.test(gender_tab)$expected < 5)) {
+  res <- fisher.test(gender_tab)
+  list(name = "Fisher's exact", stat = NA_real_,
+       df = NA_real_, p = res$p.value, es = NA, lo = NA, hi = NA)
+} else {
+  res <- chisq.test(gender_tab)
+  v   <- effectsize::cramers_v(gender_tab)
+  list(name = "χ²", stat = unname(res$statistic), df = unname(res$parameter),
+       p = res$p.value, es = v$Cramers_v_adjusted,
+       lo = v$CI_low, hi = v$CI_high)
+}
+
+# --- Build the publication table --------------------------------------------
+n_p  <- sum(data_stimuli$stim_group == "P",  na.rm = TRUE)
+n_sz <- sum(data_stimuli$stim_group == "SZ", na.rm = TRUE)
+
+gender_rows <- data_stimuli |>
+  count(stim_group, stim_gender) |>
+  group_by(stim_group) |>
+  mutate(pct = n / sum(n) * 100) |>
+  ungroup() |>
+  mutate(cell = sprintf("%d (%.1f%%)", n, pct)) |>
+  select(stim_group, stim_gender, cell) |>
+  pivot_wider(names_from = stim_group, values_from = cell)
+
+gender_first_row <- tibble(
+  Variable    = paste0("Gender, n (%)"),
+  P_value     = gender_rows[[2]][1],
+  SZ_value    = gender_rows[[3]][1],
+  Test        = gender_test$name,
+  Statistic   = if (!is.na(gender_test$stat))
+                  sprintf("%s%s",
+                          fmt_num(gender_test$stat, 2),
+                          ifelse(is.na(gender_test$df), "",
+                                 sprintf(" (df = %d)", gender_test$df)))
+                else "\u2014",
+  p           = fmt_p(gender_test$p),
+  `Effect size (95% CI)` = if (!is.na(gender_test$es))
+    sprintf("V = %s %s", fmt_num(gender_test$es, 2),
+            fmt_ci(gender_test$lo, gender_test$hi, 2))
+    else "\u2014"
+)
+
+continu_rows <- stim_tests |>
+  mutate(
+    Variable = paste0(pretty_label(outcome), ", mean (SD)"),
+    P_value  = fmt_msd(mean_g1, sd_g1, 2),
+    SZ_value = fmt_msd(mean_g2, sd_g2, 2),
+    Test     = test,
+    Statistic = ifelse(is.na(df),
+                       fmt_num(statistic, 2),
+                       sprintf("%s (df = %s)",
+                               fmt_num(statistic, 2), fmt_num(df, 1))),
+    p        = fmt_p(p_value),
+    `Effect size (95% CI)` = sprintf("%s = %s %s",
+                                     ifelse(str_detect(es_name, "Cohen"), "d", "r"),
+                                     fmt_num(es, 2),
+                                     fmt_ci(es_ci_lo, es_ci_hi, 2))
+  ) |>
+  select(Variable, P_value, SZ_value, Test, Statistic, p,
+         `Effect size (95% CI)`)
+
+stim_table_df <- bind_rows(continu_rows, gender_first_row) |>
+  rename(!!sprintf("P (n = %d)", n_p) := P_value,
+         !!sprintf("SZ (n = %d)", n_sz) := SZ_value)
+
+if (nrow(gender_rows) > 1) {
+  for (i in 2:nrow(gender_rows)) {
+    stim_table_df <- add_row(
+      stim_table_df,
+      Variable = paste0("  ", gender_rows$stim_gender[i]),
+      !!sprintf("P (n = %d)", n_p)  := gender_rows[[2]][i],
+      !!sprintf("SZ (n = %d)", n_sz) := gender_rows[[3]][i],
+      Test = "", Statistic = "", p = "", `Effect size (95% CI)` = ""
+    )
+  }
+}
+
+ft_stim <- plos_table(
+  stim_table_df,
+  title = "Demographic and cognitive characteristics of stimulus participants by group.",
+  footnote = c(
+    paste0("P, healthy controls; SZ, individuals with a diagnosis of schizophrenia. ",
+           "SD, standard deviation; CI, confidence interval; ",
+           "d, Cohen's d; V, Cramér's V."),
+    paste0("Tests were selected automatically based on Shapiro-Wilk (normality) ",
+           "and Levene (variance homogeneity) tests; p-values are two-sided.")
+  )
+)
+ft_stim
+save_table(ft_stim, "table_02_stimuli_characteristics")
+```
+
+## SZ clinical characteristics
+
+**Purpose.** Describe clinical characteristics of the SZ subgroup. These
+variables are reported descriptively only; no group comparison applies
+as they are SZ-specific.
+
+```{r sz-clinical}
+sz_only <- data_stimuli |> filter(stim_group == "SZ")
+vars_sz <- c("stim_PANSS_positive", "stim_PANSS_negative",
+             "stim_PANSS_psychopathology",
+             "stim_diagnostic_duration", "stim_chlorpro_mg")
+
+sz_descr <- map_dfr(vars_sz, function(v) {
+  x <- sz_only[[v]]
+  shap <- if (sum(!is.na(x)) >= 3) shapiro.test(x)$p.value else NA_real_
+  tibble(
+    Variable           = pretty_label(v),
+    n                  = sum(!is.na(x)),
+    `Mean (SD)`        = fmt_msd(mean(x, na.rm = TRUE), sd(x, na.rm = TRUE), 2),
+    `Median [Q1, Q3]`  = fmt_med_iqr(x, 2),
+    Range              = sprintf("%s - %s",
+                                 fmt_num(suppressWarnings(min(x, na.rm = TRUE)), 1),
+                                 fmt_num(suppressWarnings(max(x, na.rm = TRUE)), 1)),
+    `Shapiro-Wilk p`   = fmt_p(shap)
+  )
+})
+
+ft_sz <- plos_table(
+  sz_descr,
+  title = "Clinical characteristics of the SZ subgroup.",
+  footnote = paste0("Q1, first quartile; Q3, third quartile. ",
+                    "PANSS, Positive and Negative Syndrome Scale. ",
+                    "chlorpro mg = chlorpromazine-equivalent daily dose.")
+)
+ft_sz
+save_table(ft_sz, "table_03_SZ_clinical_descriptives")
+```
+
+## Characteristics of observers
+
+**Purpose.** Describe the observer panel that rated the stimulus videos.
+
+```{r observers-descriptives}
+n_obs   <- nrow(data_observers)
+obs_age <- data_observers$obs_age
+
+obs_continuous_row <- tibble(
+  Variable     = "Age (years)",
+  n            = sum(!is.na(obs_age)),
+  Summary      = fmt_msd(mean(obs_age, na.rm = TRUE),
+                         sd(obs_age,   na.rm = TRUE), 1),
+  Distribution = "Mean (SD)"
+)
+
+
+obs_cat_rows <- list(
+  obs_gender    = "Gender",
+  obs_pro_sante = "Health-care professional"
+) |>
+  imap_dfr(function(label, var) {
+    data_observers |>
+      filter(!is.na(.data[[var]])) |>
+      count(.data[[var]]) |>
+      mutate(pct = n / sum(n) * 100,
+             Variable = label,
+             Level    = as.character(.data[[var]]),
+             Summary  = sprintf("%d (%.1f%%)", n, pct)) |>
+      select(Variable, Level, Summary)
+  })
+
+ft_obs_cont <- plos_table(
+  obs_continuous_row,
+  title    = "Observer panel: age summary.",
+  footnote = sprintf("Total N observers = %d.", n_obs)
+)
+ft_obs_cont
+save_table(ft_obs_cont, "table_04a_observers_age")
+
+ft_obs_cat <- plos_table(
+  obs_cat_rows,
+  title    = "Observer panel: gender and health-care professional status.",
+  footnote = sprintf("Total N observers = %d.", n_obs)
+)
+ft_obs_cat
+save_table(ft_obs_cat, "table_04b_observers_categorical")
+```
+
+## First impressions: descriptive statistics by group
+
+**Purpose.** Describe the total first-impression score and each of the
+ten items by group (P vs. SZ) at the evaluation level (one row per
+observer × video). These are descriptive only; the inferential group
+comparison is the linear mixed model in the next section.
+
+```{r impressions-descriptives}
+imp_targets <- c("imp_total_score", IMPRESSION_ITEMS)
+
+imp_descr <- map_dfr(imp_targets, function(v) {
+  d <- data_complete |> filter(!is.na(.data[[v]]))
+  by_group <- d |>
+    group_by(stim_group) |>
+    summarise(n = dplyr::n(),
+              m = mean(.data[[v]]),
+              s = sd(.data[[v]]),
+              med = median(.data[[v]]),
+              q1  = quantile(.data[[v]], 0.25),
+              q3  = quantile(.data[[v]], 0.75),
+              .groups = "drop")
+  p_row <- by_group |> filter(stim_group == "P")
+  s_row <- by_group |> filter(stim_group == "SZ")
+  tibble(
+    Variable         = ifelse(v == "imp_total_score",
+                              "Total impression score", pretty_label(v)),
+    `P n`            = p_row$n,
+    `P mean (SD)`    = fmt_msd(p_row$m, p_row$s, 2),
+    `P median [IQR]` = sprintf("%s [%s, %s]",
+                               fmt_num(p_row$med, 2),
+                               fmt_num(p_row$q1, 2), fmt_num(p_row$q3, 2)),
+    `SZ n`           = s_row$n,
+    `SZ mean (SD)`   = fmt_msd(s_row$m, s_row$s, 2),
+    `SZ median [IQR]`= sprintf("%s [%s, %s]",
+                               fmt_num(s_row$med, 2),
+                               fmt_num(s_row$q1, 2), fmt_num(s_row$q3, 2))
+  )
+})
+
+ft_imp_descr <- plos_table(
+  imp_descr,
+  title    = "Descriptive statistics of the first-impression scores by group.",
+  footnote = c(
+    paste0("Evaluation-level data (one row per observer x video). ",
+           "n is the number of evaluations contributing to each group."),
+    paste0("Values are descriptive; the group difference is tested with a ",
+           "linear mixed model accounting for the observer x video structure.")
+  )
+)
+ft_imp_descr
+save_table(ft_imp_descr, "table_05_impression_descriptives")
+```
+
+## First impressions: total score (linear mixed model)
+
+**Purpose.** Test whether the total first-impression score differs
+between the SZ and P groups while accounting for the nested structure of
+the data (each observer rates several videos, each video is rated by
+several observers).
+
+**Variables.** Outcome: `imp_total_score`. Fixed effect: `stim_group`
+(reference = P). Random intercepts: observer (`obs_id`) and video
+(`vid`).
+
+```{r lmm-total}
+m_total <- fit_lmm(data_complete, "imp_total_score", "stim_group")
+res_total <- extract_lmm_results(m_total, "stim_group")
+
+# Standardised mean-difference effect size (Cohen's d, SZ - P)
+d_total <- lmm_cohens_d(m_total, "stim_group", ref = "P")
+
+# Adjusted means (emmeans) for plotting and reporting
+emm_total <- emmeans::emmeans(m_total, ~ stim_group) |>
+  as.data.frame() |> normalize_emm_ci()
+
+lmm_total_tab <- tibble(
+  Outcome     = "Total impression score",
+  Comparison  = "SZ vs. P (P = reference)",
+  `β (95% CI)`= sprintf("%s %s",
+                        fmt_num(res_total$estimate, 2),
+                        fmt_ci(res_total$ci_lo, res_total$ci_hi, 2)),
+  SE          = fmt_num(res_total$se, 2),
+  df          = fmt_num(res_total$df, 1),
+  t           = fmt_num(res_total$statistic, 2),
+  p           = fmt_p(res_total$p_value),
+  `Cohen's d (95% CI)` = sprintf("%s %s",
+                                 fmt_num(d_total$d, 2),
+                                 fmt_ci(d_total$d_lo, d_total$d_hi, 2)),
+  `R² marginal`    = fmt_num(res_total$r2_marg, 3),
+  `R² conditional` = fmt_num(res_total$r2_cond, 3),
+  `f²`        = fmt_num(res_total$f2, 3)
+)
+
+ft_lmm_total <- plos_table(
+  lmm_total_tab,
+  title = "Linear mixed model for the total first-impression score.",
+  footnote = c(
+    paste0("Model: imp_total_score ~ stim_group + (1 | obs_id) + (1 | vid). ",
+           "REML estimation; Satterthwaite denominator df."),
+    paste0("β, estimated mean difference (SZ - P); CI, confidence interval; ",
+           "Cohen's d, adjusted mean difference (SZ - P) standardised by the ",
+           "total SD (observer + video + residual); ",
+           "R² marginal, variance explained by fixed effects (Nakagawa); ",
+           "R² conditional, variance explained by fixed + random effects; ",
+           "f² = R²marg / (1 - R²marg)."),
+    model_info_line(m_total)
+  )
+)
+ft_lmm_total
+save_table(ft_lmm_total, "table_06_lmm_total_score")
+
+# ---- Random-effect variance partition (share explained by random effects) --
+ft_re_total <- fmt_re_table(
+  m_total,
+  title    = "Random-effect variance partition for the total-impression-score model.",
+  footnote = "Random intercepts: observer (obs_id) and video (vid)."
+)
+ft_re_total
+save_table(ft_re_total, "table_06b_lmm_total_random_effects")
+```
+
+
+
+
+```{r lmm-total-figure, fig.width=5, fig.height=5}
+emm_total <- emm_total |>
+  mutate(stim_group = factor(stim_group, levels = c("P", "SZ")))
+
+y_top_total <- max(emm_total$upper.CL, na.rm = TRUE) * 1.10
+
+fig_total <- ggplot(emm_total, aes(x = stim_group, y = emmean,
+                                   fill = stim_group)) +
+  geom_col(width = 0.6, colour = NA, linewidth = 0.3) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),
+                width = 0.14, linewidth = 0.4, colour = "grey20") +
+  scale_fill_manual(values = GROUP_COLOURS, guide = "none") +
+  scale_x_discrete(labels = c("P" = "HC", "SZ" = "IDS")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.10))) +
+  labs(title    = "First-impression score by group",
+       x        = "Group",
+       y        = "Total impression score",
+       caption  = paste0(
+         "Adjusted means and 95% confidence intervals from a linear mixed\n",
+         "model with random intercepts for observer and video.\n",
+         "P, healthy controls; SZ, individuals with a diagnosis of schizophrenia.\n ",
+         "Asterisks: * p < .05, ** p < .01, *** p < .001; ns, not significant.")) +
+  theme_plos()
+
+fig_total <- add_signif_bracket(fig_total, x1 = 1, x2 = 2,
+                                y_top = y_top_total,
+                                p_value = res_total$p_value)
+fig_total
+save_figure(fig_total, "Fig1_total_impression_score", width = 5, height = 5)
+```
+
+**Fig 1. Total first-impression score by group.** Adjusted means and 95
+% confidence intervals from a linear mixed model with random intercepts
+for observer and video.
+
+### Diagnostics — total impression score
+
+```{r lmm-total-diagnostics}
+diag_total <- check_lmm_assumptions(m_total)
+
+tryCatch({
+  g <- performance::check_model(m_total)
+  ggsave(file.path(PATH_FIGURES, "diag_lmm_total_score.png"),
+         g, width = 10, height = 8, dpi = 200, bg = "white")
+}, error = function(e) NULL)
+
+diag_total_tab <- fmt_diag_row(diag_total,
+                                label_value = "Total impression score",
+                                label_name  = "Outcome")
+ft_diag_total <- plos_table(
+  diag_total_tab,
+  title    = "Diagnostic checks for the total first-impression-score linear mixed model.",
+  footnote = c(
+    paste0("p > .05 indicates the corresponding assumption is supported. ",
+           "Tests: Shapiro-Wilk (residual and BLUP normality); ",
+           "Breusch-Pagan-type auxiliary regression (homoscedasticity)."),
+    paste0("Summary codes - R: residual normality; H: homoscedasticity; ",
+           "RE-obs / RE-vid: random-effect normality; ",
+           "singular: variance component on the boundary; ",
+           "non-conv.: optimiser non-convergence."),
+    paste0("Visual diagnostic panel saved as ",
+           "outputs/figures/diag_lmm_total_score.png.")
+  )
+)
+ft_diag_total
+save_table(ft_diag_total, "table_S2_lmm_total_diagnostics")
+```
+
+## First impressions: item-level analyses
+
+**Purpose.** Examine the effect of group on each of the 10
+first-impression items separately. BH-adjusted *p*-values are reported
+across the ten items.
+
+```{r lmm-items}
+items_summary <- run_lmm_set(
+  data        = data_complete,
+  outcomes    = IMPRESSION_ITEMS,
+  fixed_term  = "stim_group",
+  target_term = "stim_group",
+  bh_correction    = TRUE,
+  save_diagnostics = FALSE
+)
+
+# Standardised mean-difference effect size (Cohen's d, SZ - P) per item
+items_d <- map_dfr(IMPRESSION_ITEMS, function(it) {
+  m <- fit_lmm(data_complete, it, "stim_group")
+  bind_cols(tibble(outcome = it), lmm_cohens_d(m, "stim_group", ref = "P"))
+})
+items_summary <- left_join(items_summary, items_d, by = "outcome")
+
+items_tab <- items_summary |>
+  mutate(
+    Item        = pretty_label(outcome),
+    `β (95% CI)`= sprintf("%s %s",
+                          fmt_num(estimate, 2),
+                          fmt_ci(ci_lo, ci_hi, 2)),
+    SE          = fmt_num(se, 2),
+    df          = fmt_num(df, 1),
+    t           = fmt_num(statistic, 2),
+    p           = fmt_p(p_value),
+    `p (BH)`    = fmt_p(p_value_BH),
+    `Cohen's d (95% CI)` = sprintf("%s %s",
+                                   fmt_num(d, 2),
+                                   fmt_ci(d_lo, d_hi, 2)),
+    `R² marg`   = fmt_num(r2_marg, 3),
+    `R² cond`   = fmt_num(r2_cond, 3),
+    `f²`        = fmt_num(f2, 3)
+  ) |>
+  select(Item, `β (95% CI)`, SE, df, t, p, `p (BH)`,
+         `Cohen's d (95% CI)`, `R² marg`, `R² cond`, `f²`)
+
+ft_items <- plos_table(
+  items_tab,
+  title    = "Group effect (SZ vs. P) on each first-impression item from linear mixed models.",
+  footnote = c(
+    paste0("Each row corresponds to a separate LMM: item ~ stim_group + ",
+           "(1 | obs_id) + (1 | vid). REML; Satterthwaite df."),
+    paste0("β, estimated mean difference (SZ - P); Cohen's d, standardised ",
+           "mean difference (SZ - P); p (BH), Benjamini-Hochberg adjusted ",
+           "p-value across the 10 items. R² marginal and conditional are ",
+           "Nakagawa estimates.")
+  )
+)
+ft_items
+save_table(ft_items, "table_07_lmm_items")
+```
+
+```{r lmm-items-figure-long, fig.width=10, fig.height=5}
+emm_items <- map_dfr(IMPRESSION_ITEMS, function(it) {
+  m   <- fit_lmm(data_complete, it, "stim_group")
+  emm <- emmeans::emmeans(m, ~ stim_group) |> as.data.frame() |> normalize_emm_ci()
+  emm$item <- pretty_label(it)
+  emm
+}) |> mutate(stim_group = factor(stim_group, levels = c("P", "SZ")))
+
+star_df <- items_summary |>
+  transmute(item = pretty_label(outcome), star = p_stars(p_value_BH))
+
+y_pos <- emm_items |>
+  group_by(item) |>
+  summarise(y_top = max(upper.CL, na.rm = TRUE) * 1.05, .groups = "drop") |>
+  left_join(star_df, by = "item")
+
+fig_items <- ggplot(emm_items, aes(x = item, y = emmean, fill = stim_group)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6,
+           colour = NA, linewidth = 0.3) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL,
+                    group = stim_group),
+                position = position_dodge(width = 0.7),
+                width = 0.18, linewidth = 0.4, colour = "grey20") +
+  geom_text(data = y_pos,
+            aes(x = item, y = y_top, label = star),
+            inherit.aes = FALSE, size = 4, vjust = 0) +
+  scale_fill_manual(values = GROUP_COLOURS, name = "Group",
+                    labels = c("HC (Healthy Controls)", "IDS (Individuals with)")) +
+  scale_x_discrete(labels = c("P" = "HC", "SZ" = "IDS")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(title   = "First-impression item score by group",
+       x       = "First-impression item",
+       y       = "First-impression score",
+       caption = paste0(
+         "Adjusted means and 95% confidence intervals from linear mixed models ",
+         "with random intercepts for observer and video, fitted separately for ",
+         "each item.\n",
+         "Asterisks indicate Benjamini-Hochberg adjusted p-values across the 10 ",
+         "items (* p < .05, ** p < .01, *** p < .001; ns, not significant).")) +
+  theme_plos() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+fig_items
+save_figure(fig_items, "Fig2_impression_items_by_group",
+            width = 10.5, height = 5)
+```
+
+**Fig 2. Adjusted means for each first-impression item by group.**
+Bars are adjusted means (emmeans) from item-level linear mixed models;
+error bars are 95 % confidence intervals. Asterisks indicate
+Benjamini–Hochberg adjusted *p*-values.
+
+### Diagnostics and random effects — item-level models
+
+```{r lmm-items-diagnostics}
+items_diag_list <- map(IMPRESSION_ITEMS, function(it) {
+  m    <- fit_lmm(data_complete, it, "stim_group")
+  diag <- check_lmm_assumptions(m)
+  list(item = it, model = m, diag = diag)
+})
+
+# 1. Assumption table (10 rows, one per item)
+diag_items_tab <- map_dfr(items_diag_list, function(x) {
+  fmt_diag_row(x$diag,
+               label_value = pretty_label(x$item),
+               label_name  = "Item")
+})
+
+ft_diag_items <- plos_table(
+  diag_items_tab,
+  title    = "Diagnostic checks for the 10 item-level linear mixed models.",
+  footnote = c(
+    paste0("p > .05 indicates the corresponding assumption is supported. ",
+           "Tests: Shapiro-Wilk (residual and BLUP normality); ",
+           "Breusch-Pagan-type auxiliary regression (homoscedasticity)."),
+    paste0("Summary codes - R: residual normality; H: homoscedasticity; ",
+           "RE-obs / RE-vid: random-effect normality; ",
+           "singular: variance component on the boundary; ",
+           "non-conv.: non-convergence.")
+  )
+)
+ft_diag_items
+save_table(ft_diag_items, "table_S3_lmm_items_diagnostics")
+
+# 2. Random-effect variance partition for each item model
+re_items_tab <- map_dfr(items_diag_list, function(x) {
+  re_proportions_row(x$model, label = pretty_label(x$item),
+                     label_name = "Item")
+})
+ft_re_items <- plos_table(
+  re_items_tab,
+  title    = "Random-effect variance partition for the 10 item-level models.",
+  footnote = c(
+    paste0("Each value is the percentage of the residual (unexplained) ",
+           "variance captured by the observer random intercept, the video ",
+           "random intercept, and the residual."),
+    paste0("ICC = (observer + video) / total = proportion of variance ",
+           "attributable to the random intercepts.")
+  )
+)
+ft_re_items
+save_table(ft_re_items, "table_07b_lmm_items_random_effects")
+```
+
+## Movement features: correlations
+
+**Purpose.** Before aggregating, examine how the four directional movement
+features — quantity of motion (QoM) of the hands and of the head, each in the
+horizontal and vertical directions — covary across stimuli. Strong
+inter-correlations justify reducing them to a single composite.
+
+**Method.** Correlations among the four features at the stimulus level (one
+value per stimulus). Pearson's *r* is used when all features are approximately
+normal (Shapiro-Wilk p > .05), otherwise Spearman's *ρ*. Reporting Pearson when
+appropriate keeps this step consistent with the PCA, which decomposes the
+Pearson correlation matrix.
+
+```{r movement-correlations}
+mov_mat <- data_stimuli |>
+  select(all_of(MOVEMENT_VARS)) |>
+  filter(if_all(everything(), ~ !is.na(.)))
+
+# Pearson if all features ~normal, otherwise Spearman
+shap_p   <- vapply(mov_mat, function(z) shapiro.test(z)$p.value, numeric(1))
+cor_meth <- if (all(shap_p > 0.05)) "pearson" else "spearman"
+meth_lab <- if (cor_meth == "pearson") "Pearson" else "Spearman"
+coef_sym <- if (cor_meth == "pearson") "r" else "rho"
+cmat     <- cor(mov_mat, method = cor_meth, use = "complete.obs")
+
+cor_tab <- as.data.frame(round(cmat, 2)) |>
+  tibble::rownames_to_column("Feature") |>
+  mutate(Feature = unname(MOVEMENT_LABELS[Feature]))
+names(cor_tab)[-1] <- unname(MOVEMENT_LABELS[colnames(cmat)])
+
+ft_mov_cor <- plos_table(
+  cor_tab,
+  title = sprintf("%s correlations among the four directional movement features.",
+                  meth_lab),
+  footnote = sprintf(paste0("Stimulus-level analysis (n = %d stimuli with ",
+                            "complete movement data). %s coefficient (chosen ",
+                            "from Shapiro-Wilk normality of all features). ",
+                            "QoM, quantity of motion (rate, per second)."),
+                     nrow(mov_mat), meth_lab)
+)
+ft_mov_cor
+save_table(ft_mov_cor, "table_08_movement_correlations")
+```
+
+```{r movement-correlations-figure, fig.width=6, fig.height=5}
+lev <- unname(MOVEMENT_LABELS[MOVEMENT_VARS])
+cor_long <- as.data.frame(cmat) |>
+  tibble::rownames_to_column("v1") |>
+  pivot_longer(-v1, names_to = "v2", values_to = "coef") |>
+  mutate(v1 = factor(unname(MOVEMENT_LABELS[v1]), levels = lev),
+         v2 = factor(unname(MOVEMENT_LABELS[v2]), levels = rev(lev)))
+
+fig_mov_cor <- ggplot(cor_long, aes(v1, v2, fill = coef)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = fmt_num(coef, 2)), size = 3.4, colour = "grey15") +
+  scale_fill_gradient2(low = "#3b6fb6", mid = "white", high = "#c0392b",
+                       midpoint = 0, limits = c(-1, 1), name = coef_sym) +
+  labs(x = NULL, y = NULL, title = "Correlations among movement features",
+       caption = sprintf("Stimulus-level %s correlations.", meth_lab)) +
+  theme_plos() +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+fig_mov_cor
+save_figure(fig_mov_cor, "Fig3_movement_correlations", width = 6, height = 5)
+```
+
+**Fig 3. Correlations among the four directional movement features.**
+Stimulus-level correlations (Pearson if features are approximately normal,
+otherwise Spearman).
+
+------------------------------------------------------------------------
+
+## Aggregating the movement features (principal component analysis)
+
+**Rationale.** Given the strong inter-correlations above, the four features are
+reduced by PCA. Components with eigenvalue > 1 (Kaiser criterion) are retained;
+if more than one is retained a **varimax** rotation is applied for
+interpretability. Varimax is an *orthogonal* rotation — it keeps components
+uncorrelated (PCA components already are) and clarifies the loading pattern; it
+has **no effect when a single component is retained**. The dominant component
+summarises overall body movement.
+
+**Method.** PCA on the four z-standardised features at the stimulus level
+(`psych::principal`), reported with sampling-adequacy diagnostics (KMO,
+Bartlett), eigenvalues, communalities and a scree plot. The dominant component
+is oriented so that higher = more movement, rescaled to unit SD, and merged
+onto the evaluation-level data as `move_total_pc1`.
+
+```{r movement-pca}
+pca_input <- data_stimuli |>
+  select(stim_id, all_of(MOVEMENT_VARS)) |>
+  filter(if_all(all_of(MOVEMENT_VARS), ~ !is.na(.)))
+
+X <- pca_input |> select(all_of(MOVEMENT_VARS))
+R <- cor(X)   # Pearson matrix (what the PCA decomposes)
+
+# --- Sampling adequacy ---
+kmo  <- psych::KMO(R)
+bart <- psych::cortest.bartlett(R, n = nrow(X))
+
+# --- Eigenvalues and number of components ---
+eig        <- eigen(R, only.values = TRUE)$values
+n_keep     <- max(1L, sum(eig > 1))                       # Kaiser
+n_parallel <- tryCatch(
+  psych::fa.parallel(X, fa = "pc", plot = FALSE, n.iter = 100)$ncomp,
+  error = function(e) NA_integer_)                        # parallel analysis
+rot <- if (n_keep >= 2) "varimax" else "none"
+
+pca_move <- psych::principal(X, nfactors = n_keep, rotate = rot, scores = TRUE)
+
+# Dominant component, oriented, standardised to unit SD
+ssl       <- colSums(unclass(pca_move$loadings)^2)
+main_comp <- names(ssl)[which.max(ssl)]
+ld_main   <- unclass(pca_move$loadings)[, main_comp]
+flip      <- if (sum(ld_main) < 0) -1 else 1
+score_m   <- as.numeric(pca_move$scores[, main_comp]) * flip
+
+pca_scores <- tibble::tibble(stim_id = pca_input$stim_id,
+                             move_total_pc1 = as.numeric(scale(score_m)))
+data_complete <- data_complete |> left_join(pca_scores, by = "stim_id")
+data_stimuli  <- data_stimuli  |> left_join(pca_scores, by = "stim_id")
+
+# Table 1: sampling adequacy (KMO + Bartlett)
+suit_tab <- tibble::tibble(
+  Statistic = c("KMO (overall MSA)", "Bartlett chi-square", "Bartlett df",
+                "Bartlett p", "n (stimuli)"),
+  Value     = c(fmt_num(kmo$MSA, 3), fmt_num(bart$chisq, 1),
+                as.character(bart$df), fmt_p(bart$p.value),
+                as.character(nrow(X)))
+)
+ft_suit <- plos_table(
+  suit_tab,
+  title = "Suitability of the movement features for PCA.",
+  footnote = paste0("KMO > 0.60 acceptable, > 0.80 good (per-variable MSA in ",
+                    "kmo$MSAi). Bartlett's test of sphericity should be ",
+                    "significant. Pearson correlation matrix.")
+)
+ft_suit
+save_table(ft_suit, "table_09a_movement_pca_suitability")
+
+# Table 2: eigenvalues and variance explained
+eig_tab <- tibble::tibble(
+  Component      = paste0("PC", seq_along(eig)),
+  Eigenvalue     = fmt_num(eig, 3),
+  `% variance`   = sprintf("%.1f%%", eig / sum(eig) * 100),
+  `Cumulative %` = sprintf("%.1f%%", cumsum(eig) / sum(eig) * 100)
+)
+ft_eig <- plos_table(
+  eig_tab,
+  title = "Eigenvalues and variance explained.",
+  footnote = sprintf(paste0("Components retained (Kaiser, eigenvalue > 1): %d; ",
+                            "parallel analysis suggests: %s. Rotation: %s."),
+                     n_keep, ifelse(is.na(n_parallel), "n/a", n_parallel), rot)
+)
+ft_eig
+save_table(ft_eig, "table_09b_movement_pca_eigenvalues")
+
+# Table 3: loadings + communalities
+load_tab <- as.data.frame(round(unclass(pca_move$loadings), 3)) |>
+  tibble::rownames_to_column("Feature") |>
+  mutate(Feature = unname(MOVEMENT_LABELS[Feature]),
+         `Communality (h2)` = fmt_num(pca_move$communality, 3))
+ve <- pca_move$Vaccounted["Proportion Var", , drop = TRUE]
+ft_pca <- plos_table(
+  load_tab,
+  title = "PCA loadings and communalities (four movement features, standardised).",
+  footnote = c(
+    sprintf("Variance explained: %s.",
+            paste(sprintf("%s = %.1f%%", names(ve), ve * 100), collapse = "; ")),
+    sprintf(paste0("Dominant component (%s), oriented so higher = more movement ",
+                   "and rescaled to unit SD, used as the overall movement score. ",
+                   "Communalities (h2): variance of each feature captured by the ",
+                   "retained component(s); salient loadings |.| > 0.40."), main_comp)
+  )
+)
+ft_pca
+save_table(ft_pca, "table_09_movement_pca")
+```
+
+```{r movement-pca-scree, fig.width=5, fig.height=4}
+fig_scree <- tibble::tibble(Component = seq_along(eig), Eigenvalue = eig) |>
+  ggplot(aes(Component, Eigenvalue)) +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
+  geom_line(colour = "grey40") +
+  geom_point(size = 2.8, colour = "#3b6fb6") +
+  scale_x_continuous(breaks = seq_along(eig)) +
+  labs(title = "Scree plot (PCA of movement features)",
+       x = "Component", y = "Eigenvalue",
+       caption = "Dashed line: Kaiser criterion (eigenvalue = 1).") +
+  theme_plos()
+fig_scree
+save_figure(fig_scree, "FigS1_pca_scree", width = 5, height = 4)
+```
+
+```{r movement-pca-note, echo=FALSE, results='asis'}
+if (n_keep == 1) {
+  cat("A single component was retained, so no rotation applies; it captures one dimension of overall body movement, on which the four features load together.\n")
+} else {
+  cat(sprintf("%d components were retained and varimax-rotated; the dominant component is used as the overall movement score.\n", n_keep))
+}
+```
+
+------------------------------------------------------------------------
+
+## Movement by group
+
+**Purpose.** Describe the four movement features by group and formally test the
+group difference on the aggregate movement score (overall PCA component) at the
+stimulus level.
+
+```{r movement-by-group}
+mov_summary <- map_dfr(MOVEMENT_VARS, function(v) {
+  d <- data_stimuli |> filter(!is.na(.data[[v]]))
+  by_group <- d |>
+    group_by(stim_group) |>
+    summarise(n = dplyr::n(), m = mean(.data[[v]]), s = sd(.data[[v]]),
+              med = median(.data[[v]]), q1 = quantile(.data[[v]], .25),
+              q3 = quantile(.data[[v]], .75),
+              shap = if (dplyr::n() >= 3) shapiro.test(.data[[v]])$p.value else NA_real_,
+              .groups = "drop")
+  normal_p <- all(by_group$shap > 0.05, na.rm = TRUE)
+  p_row <- by_group |> filter(stim_group == "P")
+  s_row <- by_group |> filter(stim_group == "SZ")
+  tibble(
+    Feature      = unname(MOVEMENT_LABELS[v]),
+    `P n`        = p_row$n,
+    `P summary`  = if (normal_p) fmt_msd(p_row$m, p_row$s, 3)
+                   else sprintf("%s [%s, %s]", fmt_num(p_row$med,3), fmt_num(p_row$q1,3), fmt_num(p_row$q3,3)),
+    `SZ n`       = s_row$n,
+    `SZ summary` = if (normal_p) fmt_msd(s_row$m, s_row$s, 3)
+                   else sprintf("%s [%s, %s]", fmt_num(s_row$med,3), fmt_num(s_row$q1,3), fmt_num(s_row$q3,3)),
+    Distribution = if (normal_p) "Normal" else "Non-normal"
+  )
+})
+ft_mov_descr <- plos_table(
+  mov_summary,
+  title    = "Stimulus-level descriptive statistics for the four movement features, by group.",
+  footnote = paste0("Mean (SD) for approximately normal variables; median ",
+                    "[Q1, Q3] otherwise (Shapiro-Wilk within group, alpha = 0.05). ",
+                    "QoM normalised by video duration (rate, per second).")
+)
+ft_mov_descr
+save_table(ft_mov_descr, "table_10_movement_descriptives")
+
+# Group difference on the aggregate movement score (stimulus level)
+gt <- auto_group_test(data_stimuli, "move_total_pc1", "stim_group")
+mov_grp_tab <- tibble::tibble(
+  Comparison    = "P vs SZ",
+  `M (SD), P`   = fmt_msd(gt$mean_g1, gt$sd_g1, 2),
+  `M (SD), SZ`  = fmt_msd(gt$mean_g2, gt$sd_g2, 2),
+  Test          = gt$test,
+  Statistic     = fmt_num(gt$statistic, 2),
+  df            = ifelse(is.na(gt$df), "\u2014", fmt_num(gt$df, 1)),
+  p             = fmt_p(gt$p_value),
+  `Effect size` = sprintf("%s = %s %s", gt$es_name, fmt_num(gt$es, 2),
+                          fmt_ci(gt$es_ci_lo, gt$es_ci_hi, 2))
+)
+ft_mov_grp <- plos_table(
+  mov_grp_tab,
+  title    = "Group difference on the aggregate movement score (overall PCA component).",
+  footnote = c(
+    paste0("Stimulus-level test (one value per stimulus). The aggregate score ",
+           "is standardised to unit SD; a positive effect size denotes more ",
+           "movement in P than in SZ."),
+    "Test auto-selected from normality (Shapiro-Wilk) and variance homogeneity (Levene)."
+  )
+)
+ft_mov_grp
+save_table(ft_mov_grp, "table_11_movement_group_difference")
+```
+
+```{r movement-by-group-figure, fig.width=5, fig.height=5}
+dd_mov <- data_stimuli |>
+  filter(!is.na(move_total_pc1)) |>
+  mutate(stim_group = factor(stim_group, levels = c("P", "SZ")))
+
+# Mean +/- 95% CI per group
+summ_mov <- dd_mov |>
+  group_by(stim_group) |>
+  summarise(m = mean(move_total_pc1),
+            se = sd(move_total_pc1) / sqrt(dplyr::n()),
+            lo = m - 1.96 * se, hi = m + 1.96 * se, .groups = "drop")
+
+# Significance marker from the group test computed above (gt)
+gp_p <- gt$p_value
+star <- if (gp_p < .001) "***" else if (gp_p < .01) "**" else
+        if (gp_p < .05) "*"   else "ns"
+ybar <- max(dd_mov$move_total_pc1, na.rm = TRUE) + 0.30
+
+fig_mov_grp <- ggplot(dd_mov, aes(stim_group, move_total_pc1, fill = stim_group)) +
+  geom_violin(width = 0.9, alpha = 0.55, colour = "grey45",
+              linewidth = 0.4, trim = FALSE) +
+  geom_jitter(width = 0.07, height = 0, size = 1.6, alpha = 0.75,
+              colour = "grey25") +
+  geom_errorbar(data = summ_mov,
+                aes(x = stim_group, ymin = lo, ymax = hi),
+                width = 0.10, linewidth = 0.6, colour = "black",
+                inherit.aes = FALSE) +
+  geom_point(data = summ_mov, aes(x = stim_group, y = m),
+             size = 2.8, colour = "black", inherit.aes = FALSE) +
+  annotate("segment", x = 1, xend = 2, y = ybar, yend = ybar, colour = "grey30") +
+  annotate("text", x = 1.5, y = ybar + 0.18, label = star, size = 4.2) +
+  scale_fill_manual(values = GROUP_COLOURS, guide = "none") +
+  scale_x_discrete(labels = c("P" = "HC", "SZ" = "IDS")) +
+  labs(title = "Overall quantity of motion by group",
+       x = "Group", y = "Standardized overall quantity of motion",
+       caption = paste0("Violins: distribution; points: stimuli; black: ",
+                        "mean +/- 95% CI. Bracket: group test (", star, ").\n",
+                        "P, healthy controls; SZ, individuals with schizophrenia.")) +
+  theme_plos()
+fig_mov_grp
+save_figure(fig_mov_grp, "Fig4_movement_by_group", width = 5, height = 5)
+```
+
+**Fig 4. Overall body movement by group.** Stimulus-level aggregate movement
+score (overall PCA component). Violins show the distribution, points the
+individual stimuli, and the black marker the mean +/- 95% CI; the bracket
+reports the group test.
+
+------------------------------------------------------------------------
+
+
+## First impressions predicted by overall movement (linear mixed model)
+
+**Purpose.** Test whether overall body movement (the aggregate PCA
+component) predicts the total first-impression score, with the same
+observer × video random structure.
+
+**Variables.** Outcome: `imp_total_score`. Fixed effect:
+`move_total_pc1` (unit-SD overall movement score). Random intercepts:
+observer (`obs_id`) and video (`vid`).
+
+```{r lmm-movement-pc1}
+m_pc1 <- fit_lmm(data_complete, "imp_total_score", "move_total_pc1")
+
+pc1_fixed <- lmm_fixed_table(m_pc1, drop_intercept = TRUE)
+
+r2_pc1  <- tryCatch(performance::r2(m_pc1), error = function(e) NULL)
+r2m_pc1 <- if (!is.null(r2_pc1)) as.numeric(r2_pc1$R2_marginal)    else NA_real_
+r2c_pc1 <- if (!is.null(r2_pc1)) as.numeric(r2_pc1$R2_conditional) else NA_real_
+
+# Video-level R2: proportion of BETWEEN-VIDEO variance explained by movement
+# (Snijders & Bosker level-2 R2: reduction in the video variance vs a model
+# without movement). More informative than the marginal R2 for a video-level
+# predictor, since the marginal R2 is diluted by observer + residual variance.
+vid_var <- function(m) {
+  vc <- as.data.frame(lme4::VarCorr(m)); vc$vcov[vc$grp == "vid"]
+}
+m_null_mov <- fit_lmm(data_complete, "imp_total_score", "1")   # no movement
+r2_video   <- 1 - vid_var(m_pc1) / vid_var(m_null_mov)
+
+pc1_lmm_tab <- pc1_fixed |>
+  mutate(
+    Predictor    = "Overall movement (PCA)",
+    `β (95% CI)` = sprintf("%s %s", fmt_num(estimate, 3),
+                           fmt_ci(ci_lo, ci_hi, 3)),
+    SE           = fmt_num(se, 3),
+    df           = fmt_num(df, 1),
+    t            = fmt_num(statistic, 2),
+    p            = fmt_p(p_value)
+  ) |>
+  select(Predictor, `β (95% CI)`, SE, df, t, p)
+
+ft_lmm_pc1 <- plos_table(
+  pc1_lmm_tab,
+  title = "Linear mixed model predicting the total first-impression score from overall movement (PCA component).",
+  footnote = c(
+    paste0("Model: imp_total_score ~ move_total_pc1 + (1 | obs_id) + ",
+           "(1 | vid). REML; Satterthwaite df."),
+    sprintf(paste0("Whole-model effect sizes: marginal R2 = %s (movement), ",
+                   "conditional R2 = %s (PC1 + random effects); f2 = %s."),
+            fmt_num(r2m_pc1, 3), fmt_num(r2c_pc1, 3),
+            fmt_num(if (!is.na(r2m_pc1) && r2m_pc1 < 1) r2m_pc1/(1-r2m_pc1) else NA_real_, 3)),
+    sprintf(paste0("Video-level R2 = %s (proportion of between-video variance ",
+                   "explained by movement; Snijders & Bosker level-2 R2)."),
+            fmt_num(r2_video, 3)),
+    paste0("PC1 is standardised to unit SD; β is the change in total ",
+           "impression score per 1 SD increase in overall body movement."),
+    model_info_line(m_pc1)
+  )
+)
+ft_lmm_pc1
+save_table(ft_lmm_pc1, "table_12_lmm_movement_pc1")
+
+# ---- Random-effect variance partition --------------------------------------
+ft_re_pc1 <- fmt_re_table(
+  m_pc1,
+  title    = "Random-effect variance partition for the PC1 movement model.",
+  footnote = "Random intercepts: observer (obs_id) and video (vid)."
+)
+ft_re_pc1
+save_table(ft_re_pc1, "table_12b_lmm_movement_pc1_random_effects")
+```
+
+```{r lmm-movement-pc1-figure, fig.width=6.5, fig.height=5}
+# Fixed-effect prediction line over the PC1 range
+rng_pc1 <- range(data_complete$move_total_pc1, na.rm = TRUE)
+x_seq   <- seq(rng_pc1[1], rng_pc1[2], length.out = 100)
+newdat  <- tibble::tibble(move_total_pc1 = x_seq)
+
+Xp    <- model.matrix(~ move_total_pc1, newdat)
+beta  <- lme4::fixef(m_pc1)
+Vp    <- as.matrix(vcov(m_pc1))
+predp <- as.numeric(Xp %*% beta)
+sep   <- sqrt(diag(Xp %*% Vp %*% t(Xp)))
+pred_pc1 <- tibble::tibble(x = x_seq, y = predp,
+                           lo = predp - 1.96 * sep, hi = predp + 1.96 * sep)
+
+# Observer-BLUP-adjusted per-video means (purged of observer tendencies)
+re_obs_pc1 <- lme4::ranef(m_pc1)$obs_id |>
+  tibble::rownames_to_column("obs_id") |>
+  mutate(obs_id = as.character(obs_id)) |>
+  rename(u_obs = `(Intercept)`)
+
+pts_pc1 <- data_complete |>
+  mutate(obs_id     = as.character(obs_id),
+         stim_group = factor(stim_group, levels = c("P", "SZ"))) |>
+  filter(!is.na(move_total_pc1), !is.na(imp_total_score), !is.na(obs_id)) |>
+  left_join(re_obs_pc1, by = "obs_id") |>
+  mutate(y_adj = imp_total_score - u_obs) |>
+  group_by(stim_id, stim_group) |>
+  summarise(x = dplyr::first(move_total_pc1),
+            imp_adj = mean(y_adj, na.rm = TRUE), .groups = "drop")
+
+fig_pc1 <- ggplot() +
+  geom_ribbon(data = pred_pc1, aes(x = x, ymin = lo, ymax = hi),
+              alpha = 0.15, fill = "grey60") +
+  geom_line(data = pred_pc1, aes(x = x, y = y),
+            linewidth = 0.8, colour = "black") +
+  geom_point(data = pts_pc1, aes(x = x, y = imp_adj, fill = stim_group),
+             shape = 21, size = 2.6, colour = "black", alpha = 0.85) +
+  scale_fill_manual(
+    values = GROUP_COLOURS,
+    name = "Group",
+    breaks = c("P", "SZ"),
+    labels = c("HC", "IDS")
+  ) +
+  labs(x = "Overall standardized quantity of motion",
+       y = "Observer total first impressions score",
+       caption = paste0(
+         "Black line: fixed-effect prediction from the PC1 LMM. ",
+         "Grey ribbon: 95% CI. Points: observer-adjusted per-video means.\n",
+         "HC, healthy controls; IDS, individuals with a diagnosis of schizophrenia.")) +
+  theme_plos()
+fig_pc1
+save_figure(fig_pc1, "Fig5_movement_predicts_impression",
+            width = 6.5, height = 5)
+```
+
+**Fig 5. Total first-impression score predicted by overall movement
+(overall movement).** Black line is the fixed-effect prediction from the LMM (grey
+ribbon: 95 % CI); points are observer-adjusted per-video means.
+
+### Diagnostics — PC1 model
+
+```{r lmm-movement-pc1-diagnostics}
+diag_pc1 <- check_lmm_assumptions(m_pc1)
+
+tryCatch({
+  g <- performance::check_model(m_pc1)
+  ggsave(file.path(PATH_FIGURES, "diag_lmm_movement_pc1.png"),
+         g, width = 10, height = 8, dpi = 200, bg = "white")
+}, error = function(e) NULL)
+
+diag_pc1_tab <- fmt_diag_row(diag_pc1,
+                             label_value = "PC1 movement model",
+                             label_name  = "Model")
+ft_diag_pc1 <- plos_table(
+  diag_pc1_tab,
+  title    = "Diagnostic checks for the PC1 movement-based first-impression model.",
+  footnote = c(
+    paste0("p > .05 indicates the corresponding assumption is supported. ",
+           "Tests: Shapiro-Wilk (residual and BLUP normality); ",
+           "Breusch-Pagan-type auxiliary regression (homoscedasticity)."),
+    paste0("Summary codes - R: residual normality; H: homoscedasticity; ",
+           "RE-obs / RE-vid: random-effect normality; ",
+           "singular / non-conv.: boundary or convergence flags. ",
+           "Visual panel: outputs/figures/diag_lmm_movement_pc1.png.")
+  )
+)
+ft_diag_pc1
+save_table(ft_diag_pc1, "table_S4_lmm_movement_diagnostics")
+```
+
+------------------------------------------------------------------------
+
+## First impressions predicted by group and movement jointly
+
+**Purpose.** This is the first-impressions model of the total score
+(Section *total score*) with aggregate movement **added** as a second
+fixed effect. It answers two questions at once: (i) does movement predict
+impressions *after adjusting for diagnostic group*, and (ii) does the
+group difference *shrink* once movement is taken into account — a
+mediation-style question (movement as a candidate behavioural pathway for
+the group difference).
+
+**Variables.** Outcome: `imp_total_score`. Fixed effects: `stim_group`
+(SZ vs P) **and** `move_total_pc1` (unit-SD aggregate movement). Random
+intercepts: observer (`obs_id`) and video (`vid`).
+
+**Caveat.** Group and movement are both stimulus-level and correlated
+(movement discriminates the groups), so they are partially collinear;
+the individual coefficients are therefore estimated with less precision
+(VIF reported below), and the attenuation is descriptive, not a formal
+mediation test.
+
+```{r lmm-group-pc1}
+m_grp_pc1 <- fit_lmm(data_complete, "imp_total_score",
+                     "stim_group + move_total_pc1")
+
+gp_fixed <- lmm_fixed_table(m_grp_pc1, drop_intercept = TRUE)
+
+r2_gp  <- tryCatch(performance::r2(m_grp_pc1), error = function(e) NULL)
+r2m_gp <- if (!is.null(r2_gp)) as.numeric(r2_gp$R2_marginal)    else NA_real_
+r2c_gp <- if (!is.null(r2_gp)) as.numeric(r2_gp$R2_conditional) else NA_real_
+
+label_term <- function(x) dplyr::case_when(
+  grepl("move_total_pc1", x) ~ "Overall movement (PCA)",
+  grepl("stim_group",     x) ~ "Group (SZ vs P)",
+  TRUE ~ x)
+
+gp_tab <- gp_fixed |>
+  mutate(
+    Predictor    = label_term(term),
+    `β (95% CI)` = sprintf("%s %s", fmt_num(estimate, 2),
+                           fmt_ci(ci_lo, ci_hi, 2)),
+    SE           = fmt_num(se, 2),
+    df           = fmt_num(df, 1),
+    t            = fmt_num(statistic, 2),
+    p            = fmt_p(p_value)
+  ) |>
+  select(Predictor, `β (95% CI)`, SE, df, t, p)
+
+ft_lmm_gp <- plos_table(
+  gp_tab,
+  title = "Linear mixed model predicting the total first-impression score from group and overall movement jointly.",
+  footnote = c(
+    paste0("Model: imp_total_score ~ stim_group + move_total_pc1 + ",
+           "(1 | obs_id) + (1 | vid). REML; Satterthwaite df. β for group is ",
+           "the SZ - P difference adjusting for movement; β for PC1 is per ",
+           "1 SD of movement adjusting for group."),
+    sprintf(paste0("Whole-model effect sizes: marginal R2 = %s; ",
+                   "conditional R2 = %s; f2 = %s."),
+            fmt_num(r2m_gp, 3), fmt_num(r2c_gp, 3),
+            fmt_num(if (!is.na(r2m_gp) && r2m_gp < 1) r2m_gp/(1-r2m_gp) else NA_real_, 3)),
+    model_info_line(m_grp_pc1)
+  )
+)
+ft_lmm_gp
+save_table(ft_lmm_gp, "table_13_lmm_group_movement")
+
+# ---- Attenuation of the group effect when movement is added ----------------
+g_alone <- extract_lmm_results(m_total,   "stim_group")
+g_adj   <- extract_lmm_results(m_grp_pc1, "stim_group")
+atten_pct <- if (!is.na(g_alone$estimate) && g_alone$estimate != 0)
+  (1 - g_adj$estimate / g_alone$estimate) * 100 else NA_real_
+
+atten_tab <- tibble::tibble(
+  `Group effect (SZ - P)` = c("Unadjusted (group only)",
+                              "Adjusted for movement",
+                              "Attenuation of |β|"),
+  `β (95% CI)` = c(
+    sprintf("%s %s", fmt_num(g_alone$estimate, 2),
+            fmt_ci(g_alone$ci_lo, g_alone$ci_hi, 2)),
+    sprintf("%s %s", fmt_num(g_adj$estimate, 2),
+            fmt_ci(g_adj$ci_lo, g_adj$ci_hi, 2)),
+    sprintf("%s%%", fmt_num(atten_pct, 1))),
+  p = c(fmt_p(g_alone$p_value), fmt_p(g_adj$p_value), "")
+)
+ft_atten <- plos_table(
+  atten_tab,
+  title = "Attenuation of the group difference in first impressions after adjusting for aggregate movement.",
+  footnote = paste0(
+    "A reduction in the magnitude of the group coefficient when movement is ",
+    "added is consistent with movement partly accounting for (mediating) the ",
+    "group difference. Descriptive comparison, not a formal mediation test; ",
+    "group and movement are correlated at the stimulus level (see below).")
+)
+ft_atten
+save_table(ft_atten, "table_13b_group_effect_attenuation")
+
+# ---- Collinearity between group and movement (stimulus level) --------------
+g_num  <- as.integer(factor(data_complete$stim_group)) - 1L   # P = 0, SZ = 1
+r_gp   <- cor(g_num, data_complete$move_total_pc1, use = "complete.obs")
+vif_gp <- 1 / (1 - r_gp^2)
+collin_gp_tab <- tibble::tibble(
+  Quantity = c("Point-biserial r (group vs PC1)",
+               "Variance inflation factor (VIF)",
+               "SE inflation factor (sqrt of VIF)"),
+  Value    = c(fmt_num(r_gp, 3), fmt_num(vif_gp, 2), fmt_num(sqrt(vif_gp), 2))
+)
+ft_collin_gp <- plos_table(
+  collin_gp_tab,
+  title = "Collinearity between group and aggregate movement in the joint model.",
+  footnote = paste0(
+    "Group and movement are correlated because movement discriminates the ",
+    "groups. The VIF quantifies how much this inflates the standard errors ",
+    "of the two stimulus-level predictors and tempers the interpretation of ",
+    "their individual coefficients.")
+)
+ft_collin_gp
+save_table(ft_collin_gp, "table_13c_group_movement_collinearity")
+
+# ---- Random-effect variance partition --------------------------------------
+ft_re_gp <- fmt_re_table(
+  m_grp_pc1,
+  title    = "Random-effect variance partition for the group + movement model.",
+  footnote = "Random intercepts: observer (obs_id) and video (vid)."
+)
+ft_re_gp
+save_table(ft_re_gp, "table_13d_lmm_group_movement_random_effects")
+```
+
+```{r lmm-group-pc1-figure, fig.width=7, fig.height=3}
+pc1_row <- grepl("move_total_pc1", gp_fixed$term)
+forest_df <- tibble::tibble(
+  label = factor(
+    c("Group (SZ - P)\nunadjusted",
+      "Group (SZ - P)\nadjusting for movement",
+      "Movement\nadjusting for group"),
+    levels = c("Movement\nadjusting for group",
+               "Group (SZ - P)\nadjusting for movement",
+               "Group (SZ - P)\nunadjusted")),
+  est = c(g_alone$estimate, g_adj$estimate, gp_fixed$estimate[pc1_row]),
+  lo  = c(g_alone$ci_lo,    g_adj$ci_lo,    gp_fixed$ci_lo[pc1_row]),
+  hi  = c(g_alone$ci_hi,    g_adj$ci_hi,    gp_fixed$ci_hi[pc1_row]),
+  kind = c("Group", "Group", "Movement")
+)
+
+fig_forest <- ggplot(forest_df, aes(x = est, y = label, colour = kind)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_pointrange(aes(xmin = lo, xmax = hi), linewidth = 0.7, size = 0.6) +
+  scale_colour_manual(values = c(Group = GROUP_COLOURS[["SZ"]],
+                                 Movement = "grey25"), guide = "none") +
+  labs(x = "Effect on total first-impression score (points, 95% CI)",
+       y = NULL,
+       caption = paste0(
+         "Movement effect adjusting for group (top); group effect with and ",
+         "without adjustment for movement (middle, bottom).\n",
+         "A shift of the group estimate toward zero indicates attenuation.")) +
+  theme_plos()
+fig_forest
+save_figure(fig_forest, "Fig6_group_movement_forest", width = 7, height = 3)
+```
+
+**Fig 6. Group and movement effects on first impressions.** Point
+estimates with 95 % CIs for the group difference (unadjusted and adjusted
+for movement) and for movement (adjusted for group). Movement of the
+group estimate toward zero indicates attenuation.
+
+### Diagnostics — group + movement model
+
+```{r lmm-group-pc1-diagnostics}
+diag_gp <- check_lmm_assumptions(m_grp_pc1)
+
+tryCatch({
+  g <- performance::check_model(m_grp_pc1)
+  ggsave(file.path(PATH_FIGURES, "diag_lmm_group_movement.png"),
+         g, width = 10, height = 8, dpi = 200, bg = "white")
+}, error = function(e) NULL)
+
+diag_gp_tab <- fmt_diag_row(diag_gp, label_value = "Group + movement model",
+                            label_name = "Model")
+ft_diag_gp <- plos_table(
+  diag_gp_tab,
+  title    = "Diagnostic checks for the group + movement first-impression model.",
+  footnote = c(
+    paste0("p > .05 indicates the corresponding assumption is supported. ",
+           "Tests: Shapiro-Wilk (residual and BLUP normality); ",
+           "Breusch-Pagan-type auxiliary regression (homoscedasticity)."),
+    "Visual panel: outputs/figures/diag_lmm_group_movement.png."
+  )
+)
+ft_diag_gp
+save_table(ft_diag_gp, "table_S5_lmm_group_movement_diagnostics")
+```
+
+------------------------------------------------------------------------
+
+## Robustness: cluster bootstrap
+
+**Purpose.** The total-score model and most item models showed mild
+heteroscedasticity. To verify that the key conclusions do not depend on
+the residual-variance assumptions, the principal fixed effects are
+re-estimated with a **cluster bootstrap**: whole stimuli (videos) are
+resampled with replacement and each model is refitted, giving robust
+standard errors, percentile 95 % confidence intervals and *p*-values.
+Resampling at the **stimulus** level is appropriate because group and
+movement vary at that level, and — unlike CR2/sandwich estimators, which
+require the random effects to be nested within the clustering variable —
+the bootstrap is valid for the **crossed** observer × video structure
+used here.
+
+```{r robustness, cache=TRUE}
+# Bootstrap replicates. 500 is enough for a sensitivity check; raise to
+# 1000-2000 for the final run. ~B x 3 model refits, so the FIRST knit takes
+# a few minutes (results are cached afterwards).
+B_BOOT <- 1000
+
+boot_total   <- cluster_bootstrap_lmm(m_total,   cluster = "vid", B = B_BOOT)
+boot_pc1     <- cluster_bootstrap_lmm(m_pc1,     cluster = "vid", B = B_BOOT)
+boot_grp_pc1 <- cluster_bootstrap_lmm(m_grp_pc1, cluster = "vid", B = B_BOOT)
+
+rob_specs <- list(
+  list(boot = boot_total,   model = m_total,   term = "stim_group",
+       label = "Group (SZ - P): total-score model"),
+  list(boot = boot_pc1,     model = m_pc1,     term = "move_total_pc1",
+       label = "Overall movement: movement model"),
+  list(boot = boot_grp_pc1, model = m_grp_pc1, term = "stim_group",
+       label = "Group (SZ - P): group + movement"),
+  list(boot = boot_grp_pc1, model = m_grp_pc1, term = "move_total_pc1",
+       label = "Overall movement: group + movement")
+)
+
+rob_rows <- map_dfr(rob_specs, function(s) {
+  mb <- extract_lmm_results(s$model, s$term)
+  rr <- if (!is.null(s$boot)) s$boot[grepl(s$term, s$boot$term), ] else NULL
+  has <- !is.null(rr) && nrow(rr) > 0
+  tibble::tibble(
+    Effect              = s$label,
+    `β`                 = fmt_num(mb$estimate, 2),
+    `Model SE`          = fmt_num(mb$se, 2),
+    `Model p`           = fmt_p(mb$p_value),
+    `Bootstrap SE`      = if (has) fmt_num(rr$boot_se, 2) else "—",
+    `Bootstrap 95% CI`  = if (has) fmt_ci(rr$ci_lo, rr$ci_hi, 2) else "—",
+    `Bootstrap p`       = if (has) fmt_p(rr$p_value) else "—"
+  )
+})
+
+# Number of successful refits (surfaced so failures are visible, not silent)
+n_ok <- min(c(boot_total$n_boot, boot_pc1$n_boot, boot_grp_pc1$n_boot),
+            na.rm = TRUE)
+boot_note <- if (all(vapply(list(boot_total, boot_pc1, boot_grp_pc1),
+                            is.null, logical(1)))) {
+  paste0("Bootstrap returned no result: the clustering variable 'vid' was ",
+         "not found in the model frame. Check the random-effect name.")
+} else {
+  sprintf("Successful refits per model: at least %d of %d replicates.",
+          n_ok, B_BOOT)
+}
+
+ft_robust <- plos_table(
+  rob_rows,
+  title = "Cluster-bootstrap sensitivity analysis for the key fixed effects.",
+  footnote = c(
+    sprintf(paste0("Non-parametric cluster bootstrap resampling whole video ",
+                   "stimuli with replacement (%d replicates); percentile 95%% ",
+                   "CIs and two-sided p-values. β is on the raw ",
+                   "total-impression-score scale."), B_BOOT),
+    paste0("Agreement between the model-based and bootstrap columns indicates ",
+           "the conclusions are robust to the residual-variance (homoscedasticity) ",
+           "assumption and to the small number of stimuli."),
+    boot_note
+  )
+)
+ft_robust
+save_table(ft_robust, "table_14_robustness_cluster_bootstrap")
+```
+
+------------------------------------------------------------------------
+
+## Exploratory correlations (SZ subgroup)
+
+**Purpose (exploratory).** In the SZ subgroup, examine (a) the
+association between the movement features and the clinical
+characteristics, and (b) the association between the clinical
+characteristics and the total first-impression score. Given the small SZ
+sample, these analyses are exploratory (post-hoc) and use Spearman's
+*ρ*.
+
+**Method.** Spearman's *ρ* with 95 % CI from Fisher's *z*
+transformation. The movement analysis uses the **overall movement score**
+(aggregate PCA component); the clinical × first-impression analysis uses,
+for each SZ stimulus, the mean total impression score across observers. BH
+adjustment is applied across the set of clinical variables within each
+analysis.
+
+```{r exploratory-clinical-vars}
+clinical_vars <- c("stim_PANSS_negative",
+                   "stim_PANSS_positive",
+                   "stim_PANSS_psychopathology",
+                   "stim_diagnostic_duration",
+                   "stim_chlorpro_mg")
+```
+
+### Movement and clinical characteristics
+
+```{r movement-clinical-correlations}
+# Re-derive the SZ subset from data_stimuli (it now contains move_total_pc1,
+# added by the PCA chunk; sz_only was created earlier, before the PCA).
+sz_mov <- data_stimuli |> filter(stim_group == "SZ")
+
+cor_mov_clin <- map_dfr(clinical_vars, function(cv) {
+  d <- sz_mov |> filter(!is.na(move_total_pc1), !is.na(.data[[cv]]))
+  spearman_with_ci(d$move_total_pc1, d[[cv]]) |>
+    mutate(y = cv)
+})
+cor_mov_clin$p_value_BH <- p.adjust(cor_mov_clin$p_value, method = "BH")
+
+cor_mov_clin_tab <- cor_mov_clin |>
+  mutate(
+    Clinical     = pretty_label(y),
+    `ρ (95% CI)` = sprintf("%s %s", fmt_num(rho, 2), fmt_ci(ci_lo, ci_hi, 2)),
+    p            = fmt_p(p_value),
+    `p (BH)`     = fmt_p(p_value_BH)
+  ) |>
+  select(Clinical, n, `ρ (95% CI)`, p, `p (BH)`)
+
+ft_cor_mov_clin <- plos_table(
+  cor_mov_clin_tab,
+  title    = "Exploratory Spearman correlations between overall body movement and clinical variables (SZ subgroup).",
+  footnote = c(
+    paste0("SZ subgroup only (one value per stimulus). Overall movement is ",
+           "the aggregate PCA component. 95% CIs from Fisher's z transformation."),
+    paste0("p (BH): Benjamini-Hochberg adjusted p-value across the clinical ",
+           "variables. Exploratory.")
+  )
+)
+ft_cor_mov_clin
+save_table(ft_cor_mov_clin, "table_15_movement_clinical_correlations")
+```
+
+```{r movement-clinical-figure, fig.width=9, fig.height=6}
+mc_long <- sz_mov |>
+  select(move_total_pc1, all_of(clinical_vars)) |>
+  pivot_longer(all_of(clinical_vars), names_to = "clinical", values_to = "cval") |>
+  filter(!is.na(move_total_pc1), !is.na(cval)) |>
+  mutate(clinical = pretty_label(clinical))
+
+ann_mc <- cor_mov_clin |>
+  mutate(clinical = pretty_label(y),
+         label    = sprintf("rho = %s, %s",
+                            fmt_num(rho, 2),
+                            ifelse(fmt_p(p_value_BH) == "<.001",
+                                   "p (BH) <.001",
+                                   paste0("p (BH) = ", fmt_p(p_value_BH)))))
+
+fig_cor_mc <- ggplot(mc_long, aes(x = cval, y = move_total_pc1)) +
+  geom_smooth(method = "lm", se = TRUE, colour = "grey20",
+              fill = "grey85", linewidth = 0.6) +
+  geom_point(shape = 21, fill = GROUP_COLOURS[["SZ"]], colour = "black",
+             size = 2.4, alpha = 0.85) +
+  geom_text(data = ann_mc, aes(x = -Inf, y = Inf, label = label),
+            hjust = -0.05, vjust = 1.4, inherit.aes = FALSE,
+            size = 3, colour = "grey20") +
+  facet_wrap(~ clinical, scales = "free_x") +
+  labs(title   = "Overall movement and clinical variables (SZ subgroup)",
+       x       = "Clinical variable",
+       y       = "Overall movement (PCA, SD units)",
+       caption = paste0(
+         "SZ subgroup. Spearman correlations (annotations: rho and BH p). ",
+         "Linear fit for visualisation only.")) +
+  theme_plos() +
+  theme(strip.text = element_text(size = 9), axis.text = element_text(size = 8))
+fig_cor_mc
+save_figure(fig_cor_mc, "Fig7_movement_clinical_correlations",
+            width = 9, height = 6)
+```
+
+**Fig 7. Exploratory correlations between overall body movement and
+clinical variables (SZ subgroup).** Spearman correlations; annotations
+show *ρ* and BH-adjusted *p*-values.
+
+### Clinical characteristics and total first-impression score
+
+```{r clinical-impression-correlations}
+# Per-stimulus mean total impression score (SZ subgroup)
+imp_by_stim <- data_complete |>
+  filter(!is.na(imp_total_score)) |>
+  group_by(stim_id) |>
+  summarise(imp_total_mean = mean(imp_total_score), .groups = "drop")
+
+sz_clin_imp <- sz_only |>
+  left_join(imp_by_stim, by = "stim_id")
+
+cor_clin_imp <- spearman_multi(
+  sz_clin_imp, y = "imp_total_mean", xs = clinical_vars,
+  bh_correction = TRUE
+)
+
+cor_clin_imp_tab <- cor_clin_imp |>
+  mutate(
+    Clinical     = pretty_label(x),
+    n            = n,
+    `ρ (95% CI)` = sprintf("%s %s", fmt_num(rho, 2), fmt_ci(ci_lo, ci_hi, 2)),
+    p            = fmt_p(p_value),
+    `p (BH)`     = fmt_p(p_value_BH)
+  ) |>
+  select(Clinical, n, `ρ (95% CI)`, p, `p (BH)`)
+
+ft_cor_clin_imp <- plos_table(
+  cor_clin_imp_tab,
+  title    = "Exploratory Spearman correlations between clinical variables and the total first-impression score (SZ subgroup).",
+  footnote = c(
+    paste0("SZ subgroup only. The first-impression score is the per-stimulus ",
+           "mean of the total impression score across observers. ",
+           "95% confidence intervals from Fisher's z transformation."),
+    paste0("p (BH): Benjamini-Hochberg adjusted p-value across the clinical ",
+           "variables. Exploratory.")
+  )
+)
+ft_cor_clin_imp
+save_table(ft_cor_clin_imp, "table_16_clinical_impression_correlations")
+```
+
+```{r clinical-impression-figure, fig.width=11, fig.height=4.5}
+scatter_ci <- sz_clin_imp |>
+  select(all_of(clinical_vars), imp_total_mean) |>
+  pivot_longer(all_of(clinical_vars), names_to = "clinical", values_to = "cv") |>
+  mutate(clinical = pretty_label(clinical))
+
+ann_ci <- cor_clin_imp |>
+  mutate(clinical = pretty_label(x),
+         label    = sprintf("rho = %s, %s",
+                            fmt_num(rho, 2),
+                            ifelse(fmt_p(p_value_BH) == "<.001",
+                                   "p (BH) <.001",
+                                   paste0("p (BH) = ", fmt_p(p_value_BH)))))
+
+fig_cor_ci <- ggplot(scatter_ci, aes(x = cv, y = imp_total_mean)) +
+  geom_point(colour = GROUP_COLOURS["SZ"], alpha = 0.85, size = 1.8) +
+  geom_smooth(method = "lm", se = TRUE, colour = "grey20",
+              fill = "grey85", linewidth = 0.6) +
+  geom_text(data = ann_ci, aes(x = -Inf, y = Inf, label = label),
+            hjust = -0.05, vjust = 1.4, inherit.aes = FALSE,
+            size = 3, colour = "grey20") +
+  facet_wrap(~ clinical, scales = "free_x", nrow = 1) +
+  labs(title   = "Clinical variables and total first-impression score (SZ subgroup)",
+       x       = "Clinical score",
+       y       = "Mean total impression score (per stimulus)",
+       caption = paste0(
+         "Spearman correlations within the SZ subgroup. ",
+         "Annotations show rho and BH-adjusted p-value. ",
+         "Linear regression line shown for visualisation only.")) +
+  theme_plos() +
+  theme(strip.text = element_text(size = 9),
+        axis.text  = element_text(size = 8))
+fig_cor_ci
+save_figure(fig_cor_ci, "Fig8_clinical_impression_correlations",
+            width = 12, height = 4.5)
+```
+
+**Fig 8. Exploratory correlations between clinical variables and the
+total first-impression score (SZ subgroup).** Spearman correlations;
+annotations show *ρ* and BH-adjusted *p*-values.
+
+------------------------------------------------------------------------
+
+# Discussion notes
+
+This notebook produces the descriptive and inferential outputs for the
+corresponding manuscript: a publication-quality table for each analysis
+(`table_01` to `table_12`, plus `S` tables), and a figure for each main
+result (`Fig1` to `Fig7`). Tables are exported as Word `.docx`
+(cell-based) and the underlying processed data are written to CSV in
+`data/processed/`. Figures are exported as TIFF at 300 dpi and PNG for
+inline viewing.
+
+Every linear mixed model reports both the marginal/conditional *R²* and
+an explicit partition of the random variance (variance components,
+proportion of residual variance, ICC), so that the share of information
+captured by the observer and video random effects is visible.
+
+The interpretation of effect sizes, clinical implications, and
+limitations should be developed in the manuscript itself.
+
+------------------------------------------------------------------------
+
+# Supporting information
+
+**S1 Table. Cronbach's α if each item is dropped.** Internal-consistency
+diagnostic of the first-impression scale. See
+`results/tables/table_S1_cronbach_if_dropped.docx`.
+
+**S2 Table. Diagnostic checks for the total first-impression-score
+LMM.** Residual normality (Shapiro–Wilk), homoscedasticity
+(Breusch–Pagan-type auxiliary regression), random-effect normality
+(Shapiro–Wilk on the BLUPs of `obs_id` and `vid`), singular-fit and
+convergence flags. See
+`results/tables/table_S2_lmm_total_diagnostics.docx`.
+
+**S3 Table. Diagnostic checks for the 10 item-level LMMs.** As S2, per
+item.
+
+**S4 Table. Diagnostic checks for the overall-movement impression
+LMM.** As S2, for the model using the overall movement score (aggregate
+PCA component) as a single fixed effect. See
+`results/tables/table_S4_lmm_movement_diagnostics.docx`.
+
+**S5 Table. Diagnostic checks for the group + movement first-impression
+LMM.** As S2, for the model with diagnostic group and overall movement
+entered jointly. See
+`results/tables/table_S5_lmm_group_movement_diagnostics.docx`.
+
+**S1 Figure. Scree plot of the movement-feature PCA.** Eigenvalues of the
+components with the Kaiser reference line (eigenvalue = 1). File:
+`results/figures/FigS1_pca_scree.{tiff,png}`.
+
+**S Figures. Diagnostic plots from `performance::check_model()`.**
+Residual, QQ, posterior-predictive and random-effect diagnostic panels
+for each LMM. Files: `results/figures/diag_lmm_*.png`.
+
+**S1 File. Processed long data set.** `data/processed/data_complete.csv`
+— one row per observer × video evaluation.
+
+**S2 File. Stimulus-level data set.** `data/processed/data_stimuli.csv`
+— one row per stimulus.
+
+**S3 File. Observer-level data set.**
+`data/processed/data_observers.csv` — one row per observer.
+
+------------------------------------------------------------------------
+
+# References
+
+1.  Bates D, Mächler M, Bolker B, Walker S. Fitting linear mixed-effects
+    models using lme4. *J Stat Softw.* 2015;67(1):1–48.
+2.  Kuznetsova A, Brockhoff PB, Christensen RHB. lmerTest package: tests
+    in linear mixed effects models. *J Stat Softw.* 2017;82(13):1–26.
+3.  Nakagawa S, Schielzeth H. A general and simple method for obtaining
+    R² from generalized linear mixed-effects models. *Methods Ecol
+    Evol.* 2013;4(2):133–142.
+4.  Lenth RV. emmeans: estimated marginal means, aka least-squares
+    means. *R package version 1.x.x.*
+5.  Lüdecke D, Ben-Shachar MS, Patil I, Waggoner P, Makowski D.
+    performance: an R package for assessment, comparison and testing of
+    statistical models. *J Open Source Softw.* 2021;6(60):3139.
+6.  Benjamini Y, Hochberg Y. Controlling the false discovery rate: a
+    practical and powerful approach to multiple testing. *J R Stat Soc
+    B.* 1995;57(1):289–300.
+7.  Lang T, Altman D. Basic statistical reporting for articles published
+    in clinical medical journals: the SAMPL Guidelines. In: Smart P,
+    Maisonneuve H, Polderman A, editors. *Science Editors' Handbook.*
+    European Association of Science Editors; 2013.
+
+------------------------------------------------------------------------
+
+# Session information
+
+```{r session-info, message=TRUE}
+sessionInfo()
+```
