@@ -47,11 +47,7 @@ features, extracted at the stimulus level:
 These are first correlated, then reduced to a single overall movement
 component by PCA, which is used in the group and impression analyses.
 
-This is the third and last step of the questionnaire/statistics
-pipeline (`code/questionnaire_and_stats/`): it reads the processed
-tables produced by `01_prepare_questionnaire.Rmd` and
-`02_prepare_data.Rmd` (`data/questionnaire_and_merged/02_data_*.csv`)
-and does not re-derive them. Results are organised by hypothesis under
+This is the last step of the pipeline. Results are organised by hypothesis under
 `results/`: `descriptive/` (purely descriptive tables, no hypothesis
 test), `H1/` (group -> impression), `H2/` (group -> movement), `H3/`
 (movement -> impression), `H4/` (group and movement jointly), and
@@ -65,8 +61,6 @@ and exploratory/symptom correlations).
 ## Software
 
 ```{r software-info}
-# Printed in full at the end of the report (session info), as recommended by
-# SAMPL: "Name the statistical software package used in the analysis."
 R.version.string
 ```
 
@@ -262,17 +256,18 @@ of `imp_bizarre`; only the inverted version is included in the score and
 in the reliability analysis.
 
 ```{r cronbach}
-alpha_obj <- psych::alpha(data_complete[, IMPRESSION_ITEMS, drop = FALSE],
-                          check.keys = FALSE, warnings = FALSE)
+alpha_obj <- psych::alpha(
+  data_complete[, IMPRESSION_ITEMS, drop = FALSE],
+  check.keys = FALSE,
+  warnings = FALSE
+)
 
 alpha_summary <- tibble(
-  `N items`                       = length(IMPRESSION_ITEMS),
-  `N observations`                = sum(complete.cases(
-                                       data_complete[, IMPRESSION_ITEMS])),
-  `Cronbach's α (raw)`            = alpha_obj$total$raw_alpha,
-  `Cronbach's α (standardised)`   = alpha_obj$total$std.alpha,
-  `Guttman's λ6`                  = alpha_obj$total$`G6(smc)`,
-  `Mean inter-item correlation`   = alpha_obj$total$average_r
+  `N items` = length(IMPRESSION_ITEMS),
+  `N observations` = sum(complete.cases(
+    data_complete[, IMPRESSION_ITEMS]
+  )),
+  `Cronbach's α` = alpha_obj$total$raw_alpha
 )
 
 ft_alpha <- alpha_summary |>
@@ -280,31 +275,18 @@ ft_alpha <- alpha_summary |>
   plos_table(
     title = "Internal consistency of the 10-item first-impression scale.",
     footnote = paste0(
-      "Reliability estimated with the psych::alpha() function. ",
-      "Items: ", paste(IMPRESSION_ITEMS, collapse = ", "), ". ",
+      "Internal consistency was assessed using Cronbach's α. ",
       "imp_bizarre_inversed is the reverse-scored version of imp_bizarre."
     )
   )
+
 ft_alpha
-save_table(ft_alpha, "table_01_cronbach_alpha", RESULTS_SUPPLEMENTARY)
 
-# Alpha if item dropped (diagnostic - reported as supplementary)
-alpha_if_dropped <- alpha_obj$alpha.drop |>
-  as.data.frame() |>
-  tibble::rownames_to_column("Item") |>
-  as_tibble() |>
-  transmute(Item,
-            `α (raw) if dropped`          = fmt_num(raw_alpha, 3),
-            `α (standardised) if dropped` = fmt_num(std.alpha, 3),
-            `Mean r if dropped`           = fmt_num(average_r, 3))
-
-ft_alpha_drop <- plos_table(
-  alpha_if_dropped,
-  title = "Cronbach's α and mean inter-item correlation if each item is dropped.",
-  footnote = "Items are not removed in subsequent analyses; this is a diagnostic."
+save_table(
+  ft_alpha,
+  "table_01_cronbach_alpha",
+  RESULTS_SUPPLEMENTARY
 )
-ft_alpha_drop
-save_table(ft_alpha_drop, "table_S1_cronbach_if_dropped", RESULTS_SUPPLEMENTARY)
 ```
 
 ## Characteristics of stimulus participants
@@ -425,9 +407,7 @@ save_table(ft_stim, "table_02_stimuli_characteristics", RESULTS_DESCRIPTIVE)
 
 ## SZ clinical characteristics
 
-**Purpose.** Describe clinical characteristics of the SZ subgroup. These
-variables are reported descriptively only; no group comparison applies
-as they are SZ-specific.
+**Purpose.** Describe clinical characteristics of the SZ subgroup.
 
 ```{r sz-clinical}
 sz_only <- data_stimuli |> filter(stim_group == "SZ")
@@ -509,6 +489,9 @@ ft_obs_cat <- plos_table(
 ft_obs_cat
 save_table(ft_obs_cat, "table_04b_observers_categorical", RESULTS_DESCRIPTIVE)
 ```
+Health-care pro 1 = they are health care pro
+health-care pro 2 = they are mental health care pro
+health-care pro 3 = they are neither
 
 ## First impressions: descriptive statistics by group
 
@@ -944,14 +927,6 @@ otherwise Spearman).
 
 ## Aggregating the movement features (principal component analysis)
 
-**Rationale.** Given the strong inter-correlations above, the four features are
-reduced by PCA. Components with eigenvalue > 1 (Kaiser criterion) are retained;
-if more than one is retained a **varimax** rotation is applied for
-interpretability. Varimax is an *orthogonal* rotation — it keeps components
-uncorrelated (PCA components already are) and clarifies the loading pattern; it
-has **no effect when a single component is retained**. The dominant component
-summarises overall body movement, used as `move_total_pc1` in H3 and H4 below.
-
 **Method.** PCA on the four z-standardised features at the stimulus level
 (`psych::principal`), reported with sampling-adequacy diagnostics (KMO,
 Bartlett), eigenvalues, communalities and a scree plot. The dominant component
@@ -964,95 +939,184 @@ pca_input <- data_stimuli |>
   filter(if_all(all_of(MOVEMENT_VARS), ~ !is.na(.)))
 
 X <- pca_input |> select(all_of(MOVEMENT_VARS))
-R <- cor(X)   # Pearson matrix (what the PCA decomposes)
+R <- cor(X)
 
-# --- Sampling adequacy ---
+# Sampling adequacy
 kmo  <- psych::KMO(R)
 bart <- psych::cortest.bartlett(R, n = nrow(X))
 
-# --- Eigenvalues and number of components ---
-eig        <- eigen(R, only.values = TRUE)$values
-n_keep     <- max(1L, sum(eig > 1))                       # Kaiser
+# Eigenvalues and number of components
+eig <- eigen(R, only.values = TRUE)$values
+
+n_keep <- max(1L, sum(eig > 1))
+
 n_parallel <- tryCatch(
-  psych::fa.parallel(X, fa = "pc", plot = FALSE, n.iter = 100)$ncomp,
-  error = function(e) NA_integer_)                        # parallel analysis
-rot <- if (n_keep >= 2) "varimax" else "none"
-
-pca_move <- psych::principal(X, nfactors = n_keep, rotate = rot, scores = TRUE)
-
-# Dominant component, oriented, standardised to unit SD
-ssl       <- colSums(unclass(pca_move$loadings)^2)
-main_comp <- names(ssl)[which.max(ssl)]
-ld_main   <- unclass(pca_move$loadings)[, main_comp]
-flip      <- if (sum(ld_main) < 0) -1 else 1
-score_m   <- as.numeric(pca_move$scores[, main_comp]) * flip
-
-pca_scores <- tibble::tibble(stim_id = pca_input$stim_id,
-                             move_total_pc1 = as.numeric(scale(score_m)))
-data_complete <- data_complete |> left_join(pca_scores, by = "stim_id")
-data_stimuli  <- data_stimuli  |> left_join(pca_scores, by = "stim_id")
-
-# Table 1: sampling adequacy (KMO + Bartlett)
-suit_tab <- tibble::tibble(
-  Statistic = c("KMO (overall MSA)", "Bartlett chi-square", "Bartlett df",
-                "Bartlett p", "n (stimuli)"),
-  Value     = c(fmt_num(kmo$MSA, 3), fmt_num(bart$chisq, 1),
-                as.character(bart$df), fmt_p(bart$p.value),
-                as.character(nrow(X)))
+  psych::fa.parallel(
+    X,
+    fa = "pc",
+    plot = FALSE,
+    n.iter = 100
+  )$ncomp,
+  error = function(e) NA_integer_
 )
+
+# Keep the original variable name for compatibility
+rot <- "none"
+
+# PCA
+pca_move <- psych::principal(
+  X,
+  nfactors = n_keep,
+  rotate = rot,
+  scores = TRUE
+)
+
+# Dominant component, oriented so higher = more movement
+ssl <- colSums(unclass(pca_move$loadings)^2)
+main_comp <- names(ssl)[which.max(ssl)]
+
+ld_main <- unclass(pca_move$loadings)[, main_comp]
+flip <- if (sum(ld_main) < 0) -1 else 1
+score_m <- as.numeric(pca_move$scores[, main_comp]) * flip
+
+# Standardised overall movement score
+pca_scores <- tibble::tibble(
+  stim_id = pca_input$stim_id,
+  move_total_pc1 = as.numeric(scale(score_m))
+)
+
+data_complete <- data_complete |>
+  left_join(pca_scores, by = "stim_id")
+
+data_stimuli <- data_stimuli |>
+  left_join(pca_scores, by = "stim_id")
+
+# Table 1: sampling adequacy
+suit_tab <- tibble::tibble(
+  Statistic = c(
+    "KMO (overall MSA)",
+    "Bartlett chi-square",
+    "Bartlett df",
+    "Bartlett p",
+    "n (stimuli)"
+  ),
+  Value = c(
+    fmt_num(kmo$MSA, 3),
+    fmt_num(bart$chisq, 1),
+    as.character(bart$df),
+    fmt_p(bart$p.value),
+    as.character(nrow(X))
+  )
+)
+
 ft_suit <- plos_table(
   suit_tab,
   title = "Suitability of the movement features for PCA.",
-  footnote = paste0("KMO > 0.60 acceptable, > 0.80 good (per-variable MSA in ",
-                    "kmo$MSAi). Bartlett's test of sphericity should be ",
-                    "significant. Pearson correlation matrix.")
+  footnote = paste0(
+    "PCA was based on the Pearson correlation matrix. ",
+    "KMO and Bartlett's test are reported as descriptive checks ",
+    "of the correlation structure."
+  )
 )
+
 ft_suit
-save_table(ft_suit, "table_09a_movement_pca_suitability", RESULTS_SUPPLEMENTARY)
+save_table(
+  ft_suit,
+  "table_09a_movement_pca_suitability",
+  RESULTS_SUPPLEMENTARY
+)
 
 # Table 2: eigenvalues and variance explained
 eig_tab <- tibble::tibble(
-  Component      = paste0("PC", seq_along(eig)),
-  Eigenvalue     = fmt_num(eig, 3),
-  `% variance`   = sprintf("%.1f%%", eig / sum(eig) * 100),
+  Component = paste0("PC", seq_along(eig)),
+  Eigenvalue = fmt_num(eig, 3),
+  `% variance` = sprintf("%.1f%%", eig / sum(eig) * 100),
   `Cumulative %` = sprintf("%.1f%%", cumsum(eig) / sum(eig) * 100)
 )
+
 ft_eig <- plos_table(
   eig_tab,
   title = "Eigenvalues and variance explained.",
-  footnote = sprintf(paste0("Components retained (Kaiser, eigenvalue > 1): %d; ",
-                            "parallel analysis suggests: %s. Rotation: %s."),
-                     n_keep, ifelse(is.na(n_parallel), "n/a", n_parallel), rot)
+  footnote = sprintf(
+    paste0(
+      "Components retained using the Kaiser criterion (eigenvalue > 1): %d; ",
+      "parallel analysis suggests: %s. Rotation: %s."
+    ),
+    n_keep,
+    ifelse(is.na(n_parallel), "n/a", n_parallel),
+    rot
+  )
 )
-ft_eig
-save_table(ft_eig, "table_09b_movement_pca_eigenvalues", RESULTS_SUPPLEMENTARY)
 
-# Table 3: loadings + communalities
-load_tab <- as.data.frame(round(unclass(pca_move$loadings), 3)) |>
+ft_eig
+save_table(
+  ft_eig,
+  "table_09b_movement_pca_eigenvalues",
+  RESULTS_SUPPLEMENTARY
+)
+
+# Table 3: loadings and communalities
+load_tab <- as.data.frame(
+  round(unclass(pca_move$loadings), 3)
+) |>
   tibble::rownames_to_column("Feature") |>
-  mutate(Feature = unname(MOVEMENT_LABELS[Feature]),
-         `Communality (h2)` = fmt_num(pca_move$communality, 3))
-ve <- pca_move$Vaccounted["Proportion Var", , drop = TRUE]
+  mutate(
+    Feature = unname(MOVEMENT_LABELS[Feature]),
+    `Communality (h2)` = fmt_num(pca_move$communality, 3)
+  )
+
+variance_explained <- eig[seq_len(n_keep)] / sum(eig)
+
 ft_pca <- plos_table(
   load_tab,
   title = "PCA loadings and communalities (four movement features, standardised).",
   footnote = c(
-    sprintf("Variance explained: %s.",
-            paste(sprintf("%s = %.1f%%", names(ve), ve * 100), collapse = "; ")),
-    sprintf(paste0("Dominant component (%s), oriented so higher = more movement ",
-                   "and rescaled to unit SD, used as the overall movement score. ",
-                   "Communalities (h2): variance of each feature captured by the ",
-                   "retained component(s); salient loadings |.| > 0.40."), main_comp)
+    sprintf(
+      "Variance explained: %s.",
+      paste(
+        sprintf(
+          "PC%d = %.1f%%",
+          seq_len(n_keep),
+          variance_explained * 100
+        ),
+        collapse = "; "
+      )
+    ),
+    sprintf(
+      paste0(
+        "Dominant component (%s) was oriented so that higher scores indicate ",
+        "more movement and rescaled to unit SD for use as the overall movement score. ",
+        "Communalities (h2) indicate the proportion of variance in each feature ",
+        "captured by the retained component(s)."
+      ),
+      main_comp
+    )
   )
 )
-ft_pca
-save_table(ft_pca, "table_09_movement_pca", RESULTS_SUPPLEMENTARY)
 
-# ---- Export the PC1-augmented evaluation- and stimulus-level data ----------
-# Kept in results/supplementary/ (not data/) since move_total_pc1 is an
-# analysis-derived score, not raw or merged input data.
-write_csv(data_complete, file.path(RESULTS_SUPPLEMENTARY, "data_complete_with_movement_pc1.csv"))
-write_csv(data_stimuli,  file.path(RESULTS_SUPPLEMENTARY, "data_stimuli_with_movement_pc1.csv"))
+ft_pca
+save_table(
+  ft_pca,
+  "table_09_movement_pca",
+  RESULTS_SUPPLEMENTARY
+)
+
+# Export the PC1-augmented datasets
+write_csv(
+  data_complete,
+  file.path(
+    RESULTS_SUPPLEMENTARY,
+    "data_complete_with_movement_pc1.csv"
+  )
+)
+
+write_csv(
+  data_stimuli,
+  file.path(
+    RESULTS_SUPPLEMENTARY,
+    "data_stimuli_with_movement_pc1.csv"
+  )
+)
 ```
 
 ```{r movement-pca-scree, fig.width=5, fig.height=4}
