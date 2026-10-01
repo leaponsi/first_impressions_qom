@@ -223,9 +223,8 @@ for (p in c(RESULTS_DESCRIPTIVE, RESULTS_H1, RESULTS_H2, RESULTS_H3, RESULTS_H4,
 
 ## Load processed data
 
-Reads the three tables produced by `02_prepare_data.Rmd`
-(`data/questionnaire_and_merged/02_data_*.csv`). No merging happens
-here.
+Reads the three tables produced by `02_merge_data.Rmd`
+(`data/merged/*.csv`). 
 
 ```{r read-data}
 data_complete  <- read_csv(file.path(PATH_DATA_PROC, "data_complete.csv"),
@@ -1963,18 +1962,6 @@ components with the Kaiser reference line (eigenvalue = 1). File:
 Residual, QQ, posterior-predictive and random-effect diagnostic panels
 for each LMM. Files: `results/H1/diag_lmm_*.png`,
 `results/H3/diag_lmm_*.png`, `results/H4/diag_lmm_*.png`.
-
-**S1 File. Processed long data set.**
-`data/questionnaire_and_merged/02_data_complete.csv` — one row per
-observer × video evaluation.
-
-**S2 File. Stimulus-level data set.**
-`data/questionnaire_and_merged/02_data_stimuli.csv` — one row per
-stimulus.
-
-**S3 File. Observer-level data set.**
-`data/questionnaire_and_merged/02_data_observers.csv` — one row per
-observer.
 
 **S4 File. PC1-augmented data sets.**
 `results/supplementary/data_complete_with_movement_pc1.csv` and
