@@ -1522,8 +1522,8 @@ ft_atten
 save_table(ft_atten, "table_13b_group_effect_attenuation", RESULTS_H4)
 
 # ---- Collinearity between group and movement (stimulus level) --------------
-g_num  <- as.integer(factor(data_complete$stim_group)) - 1L   # P = 0, SZ = 1
-r_gp   <- cor(g_num, data_complete$move_total_pc1, use = "complete.obs")
+g_num  <- as.integer(factor(data_stimuli$stim_group)) - 1L   # P = 0, SZ = 1
+r_gp   <- cor(g_num, data_stimuli$move_total_pc1, use = "complete.obs")
 vif_gp <- 1 / (1 - r_gp^2)
 collin_gp_tab <- tibble::tibble(
   Quantity = c("Point-biserial r (group vs PC1)",
@@ -1635,9 +1635,9 @@ observer × video structure used here. H2 (a simple two-group test, not
 an LMM) is not part of this bootstrap.
 
 ```{r robustness, cache=TRUE}
-# Bootstrap replicates. 500 is enough for a sensitivity check; raise to
-# 1000-2000 for the final run. ~B x 3 model refits, so the FIRST knit takes
-# a few minutes (results are cached afterwards).
+# Bootstrap replicates: ~B x 3 model refits, so this chunk takes a few
+# minutes every time (run_statistics.Rmd deletes the knit cache after
+# each run, so it's no longer skipped on subsequent runs).
 B_BOOT <- 1000
 
 boot_total   <- cluster_bootstrap_lmm(m_total,   cluster = "vid", B = B_BOOT)
@@ -1933,19 +1933,17 @@ limitations should be developed in the manuscript itself.
 
 # Supporting information
 
-**S1 Table. Cronbach's α if each item is dropped.** Internal-consistency
-diagnostic of the first-impression scale. See
-`results/supplementary/table_S1_cronbach_if_dropped.docx`.
+**S1 File. Processed long data set.**
+`data/merged/data_complete.csv` — one row per
+observer × video evaluation.
 
-**S2 Table. Diagnostic checks for the total first-impression-score
-LMM (H1).** Residual normality (Shapiro–Wilk), homoscedasticity
-(Breusch–Pagan-type auxiliary regression), random-effect normality
-(Shapiro–Wilk on the BLUPs of `obs_id` and `vid`), singular-fit and
-convergence flags. See
-`results/H1/table_S2_lmm_total_diagnostics.docx`.
+**S2 File. Stimulus-level data set.**
+`data/merged/data_stimuli.csv` — one row per
+stimulus.
 
-**S3 Table. Diagnostic checks for the 10 item-level LMMs (H1).** As S2, per
-item.
+**S3 File. Observer-level data set.**
+`data/merged/data_observers.csv` — one row per
+observer.
 
 **S4 Table. Diagnostic checks for the overall-movement impression
 LMM (H3).** As S2, for the model using the overall movement score (aggregate

@@ -1,0 +1,18 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# knitr/rmarkdown: figures and cache folders auto-generated next to a .Rmd
+# when it's rendered (e.g. statistical_analysis_files/, *_cache/)
+*_files/
+*_cache/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
