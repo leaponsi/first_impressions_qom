@@ -17,8 +17,8 @@ stimuli.
 ├── data/                Raw and processed data (see data/README.md)
 ├── results/             Tables and figures, organised by hypothesis (see results/README.md)
 ├── run_movement.py      Runs the movement pipeline (step 1)
-├── run_statistics.Rmd   Runs the questionnaire + statistics pipeline (step 2)
-└── LICENSE
+└── run_statistics.Rmd   Runs the questionnaire + statistics pipeline (step 2)
+
 ```
 
 See `code/README.md` for how the pipeline chains together in detail,
@@ -49,6 +49,3 @@ Step 2 depends on step 1's output, so don't run them out of order.
 `car`, `effectsize`, `psych`, `flextable`, `gt`, `officer`, `scales`,
 `patchwork`.
 
-## License
-
-See `LICENSE`.
